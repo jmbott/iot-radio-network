@@ -1,10 +1,11 @@
-// Feather9x_RX
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple messaging client (receiver)
-// with the RH_RF95 class. RH_RF95 class does not provide for addressing or
-// reliability, so you should only use RH_RF95 if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example Feather9x_TX
+/*
+  IOT Project: JSJC
+
+  Remote node in radio node network
+
+  3.26.2017 - basic reciever code added, RH_RF95 class
+
+*/
 
 #include <SPI.h>
 #include <RH_RF95.h>
@@ -14,33 +15,33 @@
 #define RFM95_RST 4
 #define RFM95_INT 3
 
-/* Feather m0 w/wing 
-#define RFM95_RST     11   // "A"
-#define RFM95_CS      10   // "B"
-#define RFM95_INT     6    // "D"
-*/
-
 // Change to 434.0 or other frequency, must match RX's freq!
 #define RF95_FREQ 433.0
+
+// Set the transmission power
+#define POWER 23
 
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
-// Blinky on receipt
+// Blink on receipt
 #define LED 13
 
-void setup() 
-{
-  pinMode(LED, OUTPUT);     
+// Define default reply
+#define REPLY "message recieved"
+
+// the setup function runs on reset
+void setup() {
+  pinMode(LED, OUTPUT);
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
-  //while (!Serial);
-  Serial.begin(9600);
+  // Set baud rate
+  Serial.begin(115200);
   delay(100);
 
   Serial.println("Feather LoRa RX Test!");
-  
+
   // manual reset
   digitalWrite(RFM95_RST, LOW);
   delay(10);
@@ -63,35 +64,42 @@ void setup()
   // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
 
   // The default transmitter power is 13dBm, using PA_BOOST.
-  // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
-  // you can set transmitter powers from 5 to 23 dBm:
-  rf95.setTxPower(23, false);
+  // Using RFM95/96/97/98 modules which use the PA_BOOST transmitter pin, you
+  // can set transmitter powers from 5 to 23 dBm:
+  rf95.setTxPower(POWER, false);
 }
 
-void loop()
-{
+// the loop function runs over and over again forever
+void loop() {
   if (rf95.available())
   {
-    // Should be a message for us now   
+    // Recieve incomming message
+    // uint8_t is a type of unsigned integer of length 8 bits
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
-    
+
+    // if recieved signal is something
     if (rf95.recv(buf, &len))
     {
+      // turn led on to indicate recieved signal
       digitalWrite(LED, HIGH);
       RH_RF95::printBuffer("Received: ", buf, len);
+      // print in the serial monitor what was recived
       Serial.print("Got: ");
       Serial.println((char*)buf);
-       Serial.print("RSSI: ");
+      // and the signal strength
+      Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);
       delay(10);
       // Send a reply
-      uint8_t data[] = "And hello back to you";
+      uint8_t data[] = REPLY;
       rf95.send(data, sizeof(data));
       rf95.waitPacketSent();
+      // print in serial monitor the action
       Serial.println("Sent a reply");
       digitalWrite(LED, LOW);
     }
+    // if recieved signal is nothing
     else
     {
       Serial.println("Receive failed");
