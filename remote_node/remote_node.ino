@@ -4,6 +4,7 @@
   Remote node in radio node network
 
   3.26.2017 - basic reciever code added, RH_RF95 class
+  3.27.2017 - echo recieved message
 
 */
 
@@ -92,8 +93,9 @@ void loop() {
       Serial.println(rf95.lastRssi(), DEC);
       delay(10);
       // Send a reply
-      uint8_t data[] = REPLY;
-      rf95.send(data, sizeof(data));
+      //uint8_t data[] = REPLY; // predestined response
+      //rf95.send(data, sizeof(data)); // predestined response
+      rf95.send(buf, sizeof(buf)); // echo back
       rf95.waitPacketSent();
       // print in serial monitor the action
       Serial.println("Sent a reply");

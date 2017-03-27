@@ -29,7 +29,8 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 #define LED 13
 
 // Define default message
-#define MESSAGE "message to node #    "
+//#define MESSAGE "message to node #    "
+#define MESSAGE "1234567890abcdefghijklmnopqrstuvwxyz #" // recieves up to i
 
 // Define reply TIMEOUT
 #define TIMEOUT 1000
@@ -78,15 +79,16 @@ void loop()
   Serial.println("Sending to rf95_server");
   // Send a message to rf95_server
 
-  // length specified
-  char radiopacket[30] = MESSAGE;
-  // number position specify
-  itoa(packetnum++, radiopacket+16, 10);
+  // length specified here 8B max? for rf95
+  char radiopacket[39] = MESSAGE;
+  // number position specify, must be within packetlength and can't be spaced with none
+  itoa(packetnum++, radiopacket+38, 10);
   Serial.print("Sending "); Serial.println(radiopacket);
   radiopacket[19] = 0;
 
   Serial.println("Sending..."); delay(10);
-  rf95.send((uint8_t *)radiopacket, 30);
+  // actual max sent length specified
+  rf95.send((uint8_t *)radiopacket, 50);
 
   Serial.println("Waiting for packet to complete..."); delay(10);
   rf95.waitPacketSent();
