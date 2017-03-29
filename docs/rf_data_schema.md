@@ -14,7 +14,7 @@
 |   | Response |  | *** | [2B] |  |  | [4B] | [2B-Current Credit] | [16B] | [1B] | ### |
 |  6 | Call | Recharge Meter | *** | [2B] | 0x01 | 0x06 | [4B] | [2B-Credit to Add] | [16B] | [1B] | ### |
 |   | Response |  | *** | [2B] |  |  | [4B] | [1B-ValidatedCommunication:0x01(yes),0x02(no)] | [16B] | [1B] | ### |
-|  7 | Call | Version Sync | *** | [2B] | 0x01 | 0x08 | [4B] | [1B-NumberSupportedVersions(currently_1)] [#B-Commands&Conventions] | [16B] | [1B] | ### |
+|  7 | Call | Version Sync | *** | [2B] | 0x01 | 0x07 | [4B] | [1B-NumberSupportedVersions(currently_1)] [#B-Commands&Conventions] | [16B] | [1B] | ### |
 |   | Response |  | *** | [2B] |  |  | [4B] | [1B-ValidatedCommunication:0x01(yes),0x02(no)] | [16B] | [1B] | ### |
-|  8 | Call | Time Sync | *** | [2B] | 0x01 | 0x09 | [4B] | [4B-CurrentTimeStamp] | [16B] | [1B] | ### |
+|  8 | Call | Time Sync | *** | [2B] | 0x01 | 0x08 | [4B] | [4B-CurrentTimeStamp] | [16B] | [1B] | ### |
 |   | Response |  | *** | [2B] |  |  | [4B] | [1B-ValidatedCommunication:0x01(yes),0x02(no)] | [16B] | [1B] | ### |
