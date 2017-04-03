@@ -35,6 +35,12 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 // Define reply TIMEOUT
 #define TIMEOUT 1000
 
+/************************************************ WAN Time Sync *********************************************/
+
+
+
+/************************************************ WAN Time Sync *********************************************/
+
 void setup() {
   pinMode(LED, OUTPUT);
   pinMode(RFM95_RST, OUTPUT);
