@@ -110,20 +110,23 @@ void setup()
 
   digitalWrite(TXcontrol, RS485Receive);  // Init Transceiver
 
-  Serial2.begin(4800);
+  Serial2.begin(9600);
 
   // Assign pins 10 & 11 SERCOM functionality
-  pinPeripheral(10, PIO_SERCOM);
-  pinPeripheral(11, PIO_SERCOM);
+  pinPeripheral(RX, PIO_SERCOM);
+  pinPeripheral(TX, PIO_SERCOM);
 
 }
 
 void loop()
+// Serial.print prints ANCII while Serail.write prints bytes
+
 {
   digitalWrite(Pin13LED, HIGH);  // Show activity
   if (Serial.available())
   {
     byteReceived = Serial.read();
+    //Serial.println(byteReceived);
 
     digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
     Serial2.write(byteReceived);          // Send byte to Remote Arduino
