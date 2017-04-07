@@ -5,32 +5,38 @@
    - To other unit Pins 11,10, Gnd  (Cross over)
    - Open Serial Monitor, type in top window.
    - Same characters sent to smart meter
+ [REF] https://learn.adafruit.com/using-atsamd21-sercom-to-add-more-spi-i2c-serial-ports/creating-a-new-serial
+   - Hardware Serial Documentation
 */
 
-#include <SoftwareSerial.h>
+#include <Arduino.h>   // required before wiring_private.h
+#include "wiring_private.h" // pinPeripheral() function
 
 #define RX               10  //Serial Receive pin
 #define TX               11  //Serial Transmit pin
 
-#define TXcontrol        3   //RS485 Direction control
+#define TXcontrol        6   //RS485 Direction control
 
 #define RS485Transmit    HIGH
 #define RS485Receive     LOW
 
 #define Pin13LED         13
 
-// Declare objects
-SoftwareSerial RS485Serial(RX, TX); // RX, TX
-
 // Declare Variables
 int byteReceived;
 int byteSend;
+
+Uart Serial2 (&sercom1, RX, TX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
+void SERCOM1_Handler()
+{
+  Serial2.IrqHandler();
+}
 
 void setup()
 {
   // Start the built-in serial port, probably to Serial Monitor
   Serial.begin(115200);
-  Serial.println("SoftwareSerial meter communication");
+  Serial.println("Meter communication");
   Serial.println("Use Serial Monitor, type in upper window, ENTER");
 
   pinMode(Pin13LED, OUTPUT);
@@ -38,8 +44,11 @@ void setup()
 
   digitalWrite(TXcontrol, RS485Receive);  // Init Transceiver
 
-  // Start the software serial port, to another device
-  RS485Serial.begin(4800);   // set the data rate
+  Serial2.begin(4800);
+
+  // Assign pins 10 & 11 SERCOM functionality
+  pinPeripheral(10, PIO_SERCOM);
+  pinPeripheral(11, PIO_SERCOM);
 
 }
 
@@ -51,17 +60,17 @@ void loop()
     byteReceived = Serial.read();
 
     digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
-    RS485Serial.write(byteReceived);          // Send byte to Remote Arduino
+    Serial2.write(byteReceived);          // Send byte to Remote Arduino
 
     digitalWrite(Pin13LED, LOW);  // Show activity
     delay(10);
     digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   }
 
-  if (RS485Serial.available())  //Look for data from other Arduino
+  if (Serial2.available())  //Look for data from other Arduino
    {
     digitalWrite(Pin13LED, HIGH);  // Show activity
-    byteReceived = RS485Serial.read();    // Read received byte
+    byteReceived = Serial2.read();    // Read received byte
     Serial.write(byteReceived);        // Show on Serial Monitor
     delay(10);
     digitalWrite(Pin13LED, LOW);  // Show activity
