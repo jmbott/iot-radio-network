@@ -7,6 +7,72 @@
    - Same characters sent to smart meter
  [REF] https://learn.adafruit.com/using-atsamd21-sercom-to-add-more-spi-i2c-serial-ports/creating-a-new-serial
    - Hardware Serial Documentation
+
+   Baudrate: 9600
+   Parity: None
+   DataBits: 8
+   StopBits: 1
+
+   Read Voltage from meter 006
+   Call: 06 03 00 08 00 01 04 7F
+   Resp: 06 03 02 30 CC 19 D1
+   Note: 124.92V
+
+   Read Current from meter 006
+   Call: 06 03 00 09 00 01 55 BF
+   Resp: 06 03 02 00 00 0D 84
+   Note: 0.000A
+
+   Read Frequency from meter 006
+   Call: 06 03 00 17 00 01 35 B9
+   Resp: 06 03 02 17 6B 43 9B
+   Note: 59.95Hz
+
+   Read Power from meter 006
+   Call: 06 03 00 18 00 01 05 BA
+   Resp: 06 03 02 00 00 0D 84
+   Note: 0.000kW
+
+   Read Power Factor from meter 006
+   Call: 06 03 00 0F 00 01 B5 BE
+   Resp: 06 03 02 00 00 0D 84
+   Note: 0.00
+
+   Read Total Energy from meter 006
+   Call: 06 03 00 11 00 02 95 B9
+   Resp: 06 03 04 00 00 00 00 8C F3
+   Note: 0.0000kWh
+
+   Read Relay Status from meter 006
+   Call: 06 03 00 0D 00 01 14 7E
+   Resp: 06 03 02 00 01 CC 44
+   Note: ON
+
+   Read Temperature from meter 006
+   Call: 06 03 20 14 00 01 CE 79
+   Resp: 06 03 02 00 1C 0C 4D
+   Note: 28C
+
+   Read Warnings from meter 006
+   Call: 06 03 00 10 00 01 84 78
+   Resp: 06 03 02 00 00 0D 84
+   Note: none
+
+   Read Balance from meter 006
+   Call: 06 03 20 18 00 02 4E 7B
+   Resp: 06 03 04 00 00 03 E8 8C 4D
+   Note: 10.00
+
+   For different meter first byte is meter number and the last byte is different.
+
+   Write Relay Status OFF for meter 006
+   Call: 06 06 00 0D 00 00 19 BE
+   Resp: 06 06 00 0D 00 00 19 BE
+
+   Write Relay Status ON for meter 006
+   Call: 06 06 00 0D 00 01 D8 7E
+   Resp: 06 06 00 0D 00 01 D8 7E
+
 */
 
 #include <Arduino.h>   // required before wiring_private.h
