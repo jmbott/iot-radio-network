@@ -73,6 +73,30 @@
    Call: 06 06 00 0D 00 01 D8 7E
    Resp: 06 06 00 0D 00 01 D8 7E
 
+   Ex:
+   int readAmp(int rank) {
+     byte data[12] = {0x00, 0x05, 0x00, 0x00, 0x00, 0x06, 0x01, 0x03, 0x00, 0x00, 0x00, 0x02};
+     uint16_t addr = 201 + rank * 2;
+     //Serial.print("--ReadAmp-- Address : ");
+     //Serial.print(addr);
+     //Serial.print(" -- ");
+     byte *p = (byte *)&addr;
+     data[9] = p[0];
+     data[8] = p[1];
+     //Serial.print(data[8], HEX);
+     //Serial.print(" ");
+     //Serial.println(data[9], HEX);
+     if (meterConn.write(data, 12) == 12) {
+       meter_should_receive = 13;
+       //Serial.print("--Read Amp function finished, Address : "); Serial.println(addr);
+       return 1;
+     }
+     else {
+       //Serial.print("--Read Amp function finished, Address : "); Serial.println(addr);
+       return 0;
+     }
+   }
+
 */
 
 #include <Arduino.h>   // required before wiring_private.h
