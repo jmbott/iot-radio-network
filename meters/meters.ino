@@ -113,7 +113,7 @@
 #define Pin13LED         13
 
 // Declare Variables
-int byteReceived;
+//byte byteReceived;
 int byteSend;
 
 Uart Serial2 (&sercom1, RX, TX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
@@ -122,10 +122,13 @@ void SERCOM1_Handler()
   Serial2.IrqHandler();
 }
 
+int x = 0;
+
 void setup()
 {
   // Start the built-in serial port, probably to Serial Monitor
   Serial.begin(115200);
+  delay(2000);
   Serial.println("Meter communication");
   Serial.println("Use Serial Monitor, type in upper window, ENTER");
 
@@ -140,6 +143,7 @@ void setup()
   pinPeripheral(RX, PIO_SERCOM);
   pinPeripheral(TX, PIO_SERCOM);
 
+
 }
 
 void loop()
@@ -147,10 +151,12 @@ void loop()
 
 {
   digitalWrite(Pin13LED, HIGH);  // Show activity
-  if (Serial.available())
+  /*if (Serial.available())
   {
     byteReceived = Serial.read();
-    //Serial.println(byteReceived);
+    Serial.println("sending:");
+    Serial.write(byteReceived);
+    Serial.println("");
 
     digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
     Serial2.write(byteReceived);          // Send byte to Remote Arduino
@@ -158,15 +164,76 @@ void loop()
     digitalWrite(Pin13LED, LOW);  // Show activity
     delay(10);
     digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  }*/
+
+  digitalWrite(Pin13LED, HIGH);  // Show activity
+
+  if (x == 0) {
+    //byte byteReceived = 0x05;
+    byte byteReceived[8] = {0x06, 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
+    Serial.println("OFF");
+    Serial.println("sending:");
+    //Serial.print(byteReceived,HEX);
+    Serial.print(byteReceived[0],HEX);
+    Serial.print(byteReceived[1],HEX);
+    Serial.print(byteReceived[2],HEX);
+    Serial.print(byteReceived[3],HEX);
+    Serial.print(byteReceived[4],HEX);
+    Serial.print(byteReceived[5],HEX);
+    Serial.print(byteReceived[6],HEX);
+    Serial.print(byteReceived[7],HEX);
+    Serial.print(byteReceived[8],HEX);
+    Serial.println("");
+
+    digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+    Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+    digitalWrite(Pin13LED, LOW);  // Show activity
+    delay(10);
+    digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   }
 
-  if (Serial2.available())  //Look for data from other Arduino
-   {
+  if (x == 100000) {
+    //byte byteReceived = 0x05;
+    byte byteReceived[8] = {0x06, 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
+    Serial.println("ON");
+    Serial.println("sending:");
+    //Serial.print(byteReceived,HEX);
+    Serial.print(byteReceived[0],HEX);
+    Serial.print(byteReceived[1],HEX);
+    Serial.print(byteReceived[2],HEX);
+    Serial.print(byteReceived[3],HEX);
+    Serial.print(byteReceived[4],HEX);
+    Serial.print(byteReceived[5],HEX);
+    Serial.print(byteReceived[6],HEX);
+    Serial.print(byteReceived[7],HEX);
+    Serial.print(byteReceived[8],HEX);
+    Serial.println("");
+
+    digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+    Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+    digitalWrite(Pin13LED, LOW);  // Show activity
+    delay(10);
+    digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  }
+
+  while (Serial2.available()) {//Look for data from other Arduino
     digitalWrite(Pin13LED, HIGH);  // Show activity
-    byteReceived = Serial2.read();    // Read received byte
-    Serial.write(byteReceived);        // Show on Serial Monitor
+    byte Received = Serial2.read();    // Read received byte
+    Serial.println("recieved:");
+    Serial.print(Received,HEX);        // Show on Serial Monitor
+    Serial.println("");
     delay(10);
     digitalWrite(Pin13LED, LOW);  // Show activity
-   }
+  }
+
+  x++;
+
+  if (x == 200000) {
+    //Serial.println(x);
+    delay(5000);
+    x = 0;
+  }
 
 }
