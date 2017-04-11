@@ -37,6 +37,8 @@ void setup()
   // Open serial communications
   Serial.begin(115200);
 
+  delay(2000); // delay for serial
+
   // switch from radio to ethernet
   pinMode(8, OUTPUT);
   digitalWrite(8, HIGH);
