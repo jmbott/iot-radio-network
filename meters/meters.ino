@@ -114,7 +114,7 @@
 
 // Declare Variables
 //byte byteReceived;
-int byteSend;
+//int byteSend;
 
 Uart Serial2 (&sercom1, RX, TX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
 void SERCOM1_Handler()

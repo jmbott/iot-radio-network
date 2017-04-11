@@ -21,7 +21,8 @@ Timer t;
 
 //****task variables****//
 OS_TASK *ECHO;
-OS_TASK *METER;
+OS_TASK *METER_ON;
+OS_TASK *METER_OFF;
 
 // system time
 unsigned long systime = 0;
@@ -68,10 +69,6 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 #define RS485Transmit    HIGH
 #define RS485Receive     LOW
-
-// Declare Variables
-int byteReceived;
-int byteSend;
 
 // Serial2 setup
 Uart Serial2 (&sercom1, RX, TX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
@@ -125,36 +122,77 @@ unsigned int echo(int opt) {
 
 /******************************** echo task  end *********************************/
 
-/********************************* meter task **********************************/
+/********************************* meter tasks **********************************/
 
-unsigned int meter(int opt) {
+unsigned int meter_off(int opt) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  if (Serial.available())
-  {
-    byteReceived = Serial.read();
-    //Serial.println(byteReceived);
+  //byte byteReceived = 0x05;
+  byte byteReceived[8] = {0x06, 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
+  Serial.println("OFF");
+  Serial.println("sending:");
+  //Serial.print(byteReceived,HEX);
+  Serial.print(byteReceived[0],HEX);
+  Serial.print(byteReceived[1],HEX);
+  Serial.print(byteReceived[2],HEX);
+  Serial.print(byteReceived[3],HEX);
+  Serial.print(byteReceived[4],HEX);
+  Serial.print(byteReceived[5],HEX);
+  Serial.print(byteReceived[6],HEX);
+  Serial.print(byteReceived[7],HEX);
+  Serial.print(byteReceived[8],HEX);
+  Serial.println("");
 
-    digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
-    Serial2.write(byteReceived);          // Send byte to Remote Arduino
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
-    digitalWrite(LED, LOW);  // Show activity
-    delay(10);
-    digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
-  }
-
-  if (Serial2.available())  //Look for data from other Arduino
-   {
-    digitalWrite(LED, HIGH);  // Show activity
-    byteReceived = Serial2.read();    // Read received byte
-    Serial.write(byteReceived);        // Show on Serial Monitor
-    delay(10);
-    digitalWrite(LED, LOW);  // Show activity
-   }
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
    return 1;
 }
 
-/******************************** meter task  end *********************************/
+unsigned int meter_on(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  //byte byteReceived = 0x05;
+  byte byteReceived[8] = {0x06, 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
+  Serial.println("ON");
+  Serial.println("sending:");
+  //Serial.print(byteReceived,HEX);
+  Serial.print(byteReceived[0],HEX);
+  Serial.print(byteReceived[1],HEX);
+  Serial.print(byteReceived[2],HEX);
+  Serial.print(byteReceived[3],HEX);
+  Serial.print(byteReceived[4],HEX);
+  Serial.print(byteReceived[5],HEX);
+  Serial.print(byteReceived[6],HEX);
+  Serial.print(byteReceived[7],HEX);
+  Serial.print(byteReceived[8],HEX);
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int meter_listen(int opt) {
+  while (Serial2.available()) {//Look for data from other Arduino
+    digitalWrite(LED, HIGH);  // Show activity
+    byte Received = Serial2.read();    // Read received byte
+    Serial.println("recieved:");
+    Serial.print(Received,HEX);        // Show on Serial Monitor
+    Serial.println("");
+    delay(10);
+    digitalWrite(LED, LOW);  // Show activity
+  }
+  return 1;
+}
+/******************************** meter tasks end *********************************/
 
 // the setup function runs on reset
 void setup() {
@@ -216,7 +254,8 @@ void setup() {
   OS_TASK *taskRegister(unsigned int (*funP)(int opt),unsigned long interval,unsigned char status,unsigned long temp_interval)
   taskRegister(FUNCTION, INTERVAL, STATUS, TEMP_INTERVAL); */
   //ECHO = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
-  METER = taskRegister(meter, OS_ST_PER_SECOND*10, 1, 0);
+  METER_ON = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
+  METER_OFF = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
@@ -233,6 +272,7 @@ void loop() {
 void constantTask() {
   t.update();
   echo(0);
+  meter_listen(0);
 }
 
 // support Function onDutyTime: support function for task management
