@@ -6,6 +6,7 @@
   3.26.2017 - basic reciever code added, RH_RF95 class
   3.27.2017 - echo recieved message
   4.10.2017 - lightOS integration, meter skeleton
+  4.29.2017 - Add Meter functions
 
 */
 
@@ -62,13 +63,19 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 #include <Arduino.h>   // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
 
-#define RX               10  //Serial Receive pin
-#define TX               11  //Serial Transmit pin
+#define RX 10  //Serial Receive pin
+#define TX 11  //Serial Transmit pin
 
-#define TXcontrol        6   //RS485 Direction control
+#define TXcontrol 6   //RS485 Direction control
 
-#define RS485Transmit    HIGH
-#define RS485Receive     LOW
+#define RS485Transmit HIGH
+#define RS485Receive LOW
+
+int meter_select = 0; // selected meter, init first meter
+// meter_count is the number of meters
+#define meter_count 2
+// byte meter_num[meter_count] = {METER_NUMER_1,METER_NUMER_2,etc...};
+byte meter_num[meter_count] = {0x06,0x08};
 
 // Serial2 setup
 Uart Serial2 (&sercom1, RX, TX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
@@ -123,24 +130,85 @@ unsigned int echo(int opt) {
 /******************************** echo task  end *********************************/
 
 /********************************* meter tasks **********************************/
+/*
+Baudrate: 9600
+Parity: None
+DataBits: 8
+StopBits: 1
 
-unsigned int meter_off(int opt) {
+Read Voltage from meter 006
+Call: 06 03 00 08 00 01 04 7F
+Resp: 06 03 02 30 CC 19 D1
+Note: 124.92V
+
+Read Current from meter 006
+Call: 06 03 00 09 00 01 55 BF
+Resp: 06 03 02 00 00 0D 84
+Note: 0.000A
+
+Read Frequency from meter 006
+Call: 06 03 00 17 00 01 35 B9
+Resp: 06 03 02 17 6B 43 9B
+Note: 59.95Hz
+
+Read Power from meter 006
+Call: 06 03 00 18 00 01 05 BA
+Resp: 06 03 02 00 00 0D 84
+Note: 0.000kW
+
+Read Power Factor from meter 006
+Call: 06 03 00 0F 00 01 B5 BE
+Resp: 06 03 02 00 00 0D 84
+Note: 0.00
+
+Read Total Energy from meter 006
+Call: 06 03 00 11 00 02 95 B9
+Resp: 06 03 04 00 00 00 00 8C F3
+Note: 0.0000kWh
+
+Read Relay Status from meter 006
+Call: 06 03 00 0D 00 01 14 7E
+Resp: 06 03 02 00 01 CC 44
+Note: ON
+
+Read Temperature from meter 006
+Call: 06 03 20 14 00 01 CE 79
+Resp: 06 03 02 00 1C 0C 4D
+Note: 28C
+
+Read Warnings from meter 006
+Call: 06 03 00 10 00 01 84 78
+Resp: 06 03 02 00 00 0D 84
+Note: none
+
+Read Balance from meter 006
+Call: 06 03 20 18 00 02 4E 7B
+Resp: 06 03 04 00 00 03 E8 8C 4D
+Note: 10.00
+
+For different meter first byte is meter number and the last byte is different.
+
+Write Relay Status OFF for meter 006
+Call: 06 06 00 0D 00 00 19 BE
+Resp: 06 06 00 0D 00 00 19 BE
+
+Write Relay Status ON for meter 006
+Call: 06 06 00 0D 00 01 D8 7E
+Resp: 06 06 00 0D 00 01 D8 7E
+
+*/
+
+
+unsigned int voltage(int opt) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  //byte byteReceived = 0x05;
-  byte byteReceived[8] = {0x06, 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
-  Serial.println("OFF");
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x08, 0x00, 0x01, 0x04, 0x7F};
+  Serial.println("Voltage");
   Serial.println("sending:");
-  //Serial.print(byteReceived,HEX);
-  Serial.print(byteReceived[0],HEX);
-  Serial.print(byteReceived[1],HEX);
-  Serial.print(byteReceived[2],HEX);
-  Serial.print(byteReceived[3],HEX);
-  Serial.print(byteReceived[4],HEX);
-  Serial.print(byteReceived[5],HEX);
-  Serial.print(byteReceived[6],HEX);
-  Serial.print(byteReceived[7],HEX);
-  Serial.print(byteReceived[8],HEX);
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
   Serial.println("");
 
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
@@ -149,26 +217,208 @@ unsigned int meter_off(int opt) {
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
-   return 1;
+  return 1;
+}
+
+unsigned int current(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x09, 0x00, 0x01, 0x55, 0xBF};
+  Serial.println("Current");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int frequency(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x17, 0x00, 0x01, 0x35, 0xB9};
+  Serial.println("Frequency");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int power(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x18, 0x00, 0x01, 0x05, 0xBA};
+  Serial.println("Power");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int power_factor(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x0F, 0x00, 0x01, 0xB5, 0xBE};
+  Serial.println("Power Factor");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int energy(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x11, 0x00, 0x02, 0x95, 0xB9};
+  Serial.println("Total Energy");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int relay_status(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x0D, 0x00, 0x01, 0x14, 0x7E};
+  Serial.println("Relay Status");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int temp(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x20, 0x14, 0x00, 0x01, 0xCE, 0x79};
+  Serial.println("Temperature");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int warnings(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x10, 0x00, 0x01, 0x84, 0x78};
+  Serial.println("Warnings");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}
+
+unsigned int meter_off(int opt) {
+  Serial.println("Meter Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: ");Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
+  Serial.println("OFF");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
 }
 
 unsigned int meter_on(int opt) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  //byte byteReceived = 0x05;
-  byte byteReceived[8] = {0x06, 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[meter_select], 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
   Serial.println("ON");
   Serial.println("sending:");
-  //Serial.print(byteReceived,HEX);
-  Serial.print(byteReceived[0],HEX);
-  Serial.print(byteReceived[1],HEX);
-  Serial.print(byteReceived[2],HEX);
-  Serial.print(byteReceived[3],HEX);
-  Serial.print(byteReceived[4],HEX);
-  Serial.print(byteReceived[5],HEX);
-  Serial.print(byteReceived[6],HEX);
-  Serial.print(byteReceived[7],HEX);
-  Serial.print(byteReceived[8],HEX);
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
   Serial.println("");
 
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
@@ -191,6 +441,18 @@ unsigned int meter_listen(int opt) {
     digitalWrite(LED, LOW);  // Show activity
   }
   return 1;
+}
+
+unsigned int meter_read(int opt, meter_select) {
+  voltage(0);
+  current(0);
+  frequency(0);
+  power(0);
+  power_factor(0);
+  energy(0);
+  relay_status(0);
+  temp(0);
+  warnings(0);
 }
 /******************************** meter tasks end *********************************/
 
