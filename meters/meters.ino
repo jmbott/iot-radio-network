@@ -142,8 +142,7 @@ void setup()
   // Assign pins 10 & 11 SERCOM functionality
   pinPeripheral(RX, PIO_SERCOM);
   pinPeripheral(TX, PIO_SERCOM);
-
-
+  
 }
 
 void loop()

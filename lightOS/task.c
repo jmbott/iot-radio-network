@@ -68,6 +68,7 @@ void taskPause(OS_TASK *task)
 void taskNextDutyDelay(OS_TASK *task,long interval)
 {
     task->temp_interval_time = interval;
+    task->last_run_time = getSysTime();
 }
 
 void selfNextDutyDelay(long interval)

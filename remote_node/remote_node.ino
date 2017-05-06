@@ -21,48 +21,19 @@ Timer t;
 #define OS_TASK_LIST_LENGTH 4
 
 //****task variables****//
-OS_TASK *ECHO;
-OS_TASK *METER_ON;
-OS_TASK *METER_OFF;
+OS_TASK *Echo;
+OS_TASK *Meter_On;
+OS_TASK *Meter_Off;
 
 // system time
 unsigned long systime = 0;
 unsigned long sys_start_time = 0;
 
+#define MAX_RETRY    6
+#define NEXT_COMMAND_INTERVAL     OS_ST_PER_100_MS
+
 /******************************* lightOS init end ********************************/
-/********************************* memory init **********************************/
 
-struct TARIFF {
-  uint32_t price1_start_time;
-  uint32_t price2_start_time;
-  uint16_t price1;
-  uint16_t price2;
-  uint32_t generate_time;
-  uint32_t init_time;
-} price_tariff,new_price_tariff;
-
-#define SYSTEM_INIT_ADDR              0   //1
-#define METER_NUMBER_ADDR             SYSTEM_INIT_ADDR+1                   //1
-#define STATIC_IP_ADDR                METER_NUMBER_ADDR+1                  //4
-#define TARIFF_ADDR                   STATIC_IP_ADDR+4                     //24
-#define NEW_TARIFF_FLAG_ADDR          TARIFF_ADDR+sizeof(price_tariff)     //1
-#define NEW_TARIFF_ADDR               NEW_TARIFF_FLAG_ADDR+1               //24
-#define TIME_RECORD_LIST_ADDR         NEW_TARIFF_ADDR+sizeof(price_tariff) //16
-#define METER_RECORD_LIST_ADDR        (TIME_RECORD_LIST_ADDR+sizeof(uint32_t)*FLASH_MAX_RECORD+3)&0xfffffffc
-#define METER_RECORD_LIST_ADDR_END    METER_RECORD_LIST_ADDR+sizeof(Meter_Box_Type)*FLASH_MAX_RECORD
-#define PAYMENT_RECORD_ADDR           METER_RECORD_LIST_ADDR_END+1
-
-void cleanFlashRecord() {
-  uint32_t i;
-  Serial.println("-- Flash -- Clean config file.");
-  for (i = SYSTEM_INIT_ADDR; i < PAYMENT_RECORD_ADDR; i++) {
-    Serial.print("Clean Flash: "); Serial.println(i);
-    storageWriteByte(i, 0x00);
-  }
-  Serial.println("-- Flash -- Clean config file success.");
-}
-
-/********************************* memory end **********************************/
 /********************************** radio init ***********************************/
 
 #include <SPI.h>
@@ -121,6 +92,32 @@ void SERCOM1_Handler()
 #define BOX_TASK_CONNECTING     1
 #define BOX_TASK_READING        2
 
+// First Task, (Read Voltage)
+uint8_t item_rolling = 0;
+
+// Main Meter Task
+#define METER_TASK_IDEL         0
+#define METER_TASK_NORMAL_SEND  3
+#define METER_TASK_NORMAL_REPLY 4
+#define METER_TASK_EXC_COMMAND  5
+#define METER_TASK_EXC_REPLY    6
+#define METER_TASK_SET_COIL     7
+
+// coil status
+#define METER_STATUS_POWER_OFF  0
+#define METER_STATUS_POWER_ON   1
+uint8_t coil_status = METER_STATUS_POWER_ON;
+
+// change the coil status? (initially no)
+uint8_t coil_set = 0;
+
+// initialize retries at zero
+uint8_t connect_retry = 0;
+
+// listening to how many more bytes?
+uint8_t meter_receive = 0;
+uint8_t meter_should_receive = 0;
+
 /******************************** meter init end *********************************/
 
 /********************************** echo task ***********************************/
@@ -173,13 +170,21 @@ Baudrate: 9600
 Parity: None
 DataBits: 8
 StopBits: 1
+
+Read Voltage from meter 006
+Call: 06 03 00 08 00 01 04 7F
+Resp: 06 03 02 30 CC 19 D1
+Note: 124.92V
+
+Call: Meter #, Read/Set, Register High, Register Low, ... , ... , CheckSum, CheckSum
+Resp: Meter #, Read/Set, Length, Response 1, Response 2, etc, CheckSum, CheckSum
 */
 
-unsigned int voltage(int opt) {
+unsigned int voltage(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x08, 0x00, 0x01, 0x04, 0x7F};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x08, 0x00, 0x01, 0x04, 0x7F};
   Serial.println("Voltage");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -190,17 +195,19 @@ unsigned int voltage(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int current(int opt) {
+unsigned int current(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x09, 0x00, 0x01, 0x55, 0xBF};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x09, 0x00, 0x01, 0x55, 0xBF};
   Serial.println("Current");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -211,17 +218,19 @@ unsigned int current(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int frequency(int opt) {
+unsigned int frequency(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x17, 0x00, 0x01, 0x35, 0xB9};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x17, 0x00, 0x01, 0x35, 0xB9};
   Serial.println("Frequency");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -232,17 +241,19 @@ unsigned int frequency(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int power(int opt) {
+unsigned int power(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x18, 0x00, 0x01, 0x05, 0xBA};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x18, 0x00, 0x01, 0x05, 0xBA};
   Serial.println("Power");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -253,17 +264,19 @@ unsigned int power(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int power_factor(int opt) {
+unsigned int power_factor(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x0F, 0x00, 0x01, 0xB5, 0xBE};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0F, 0x00, 0x01, 0xB5, 0xBE};
   Serial.println("Power Factor");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -274,17 +287,19 @@ unsigned int power_factor(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int energy(int opt) {
+unsigned int energy(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x11, 0x00, 0x02, 0x95, 0xB9};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x11, 0x00, 0x02, 0x95, 0xB9};
   Serial.println("Total Energy");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -295,17 +310,19 @@ unsigned int energy(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 9;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int relay_status(int opt) {
+unsigned int relay_status(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x0D, 0x00, 0x01, 0x14, 0x7E};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0D, 0x00, 0x01, 0x14, 0x7E};
   Serial.println("Relay Status");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -316,17 +333,19 @@ unsigned int relay_status(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int temp(int opt) {
+unsigned int temp(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x20, 0x14, 0x00, 0x01, 0xCE, 0x79};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x20, 0x14, 0x00, 0x01, 0xCE, 0x79};
   Serial.println("Temperature");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -337,17 +356,19 @@ unsigned int temp(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int warnings(int opt) {
+unsigned int warnings(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x03, 0x00, 0x10, 0x00, 0x01, 0x84, 0x78};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x10, 0x00, 0x01, 0x84, 0x78};
   Serial.println("Warnings");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -358,17 +379,19 @@ unsigned int warnings(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 7;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int meter_off(int opt) {
+unsigned int meter_off(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: ");Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
+  Serial.print("Selected Meter: ");Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
   Serial.println("OFF");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -379,17 +402,19 @@ unsigned int meter_off(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 8;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
   return 1;
 }
 
-unsigned int meter_on(int opt) {
+unsigned int meter_on(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[meter_select],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[meter_select], 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
+  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
   Serial.println("ON");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -400,6 +425,8 @@ unsigned int meter_on(int opt) {
   digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
   Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
 
+  meter_should_receive = 8;
+
   digitalWrite(LED, LOW);  // Show activity
   delay(10);
   digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
@@ -407,7 +434,7 @@ unsigned int meter_on(int opt) {
 }
 
 unsigned int meter_listen(int opt) {
-  while (Serial2.available()) {//Look for data from other Arduino
+  while (Serial2.available()) {//Look for data from meter
     digitalWrite(LED, HIGH);  // Show activity
     byte Received = Serial2.read();    // Read received byte
     Serial.println("recieved:");
@@ -419,17 +446,301 @@ unsigned int meter_listen(int opt) {
   return 1;
 }
 
-unsigned int meter_read(int opt, meter_select) {
-  voltage(0);
-  current(0);
-  frequency(0);
-  power(0);
-  power_factor(0);
-  energy(0);
-  relay_status(0);
-  temp(0);
-  warnings(0);
+unsigned meterMainTask(int opt) {
+  switch (meter_task_step) {
+    case METER_TASK_IDEL : {
+        break;
+      }
+    case METER_TASK_NORMAL_SEND : {
+        Serial.println(" ------------------------------------------------------ ");
+        Serial.print("--MainTask-- Send query request to meter : ");
+        Serial.print(meter_select);
+        int m_flag = -1;
+        if (item_rolling == 0) {
+          // read voltage
+          Serial.println("--MainTask-- Read Voltage");
+          m_flag = voltage(meter_select);
+        }
+        else if (item_rolling == 1) {
+          // read amp
+          Serial.println("--MainTask-- Read AMP");
+          m_flag = current(meter_select);
+        }
+        else if (item_rolling == 2) {
+          // read frequency
+          Serial.println("--MainTask-- Read Hertz");
+          m_flag = frequency(meter_select);
+        }
+        else if (item_rolling == 3) {
+          // read watt
+          Serial.println("--MainTask-- Read Watt");
+          m_flag = power(meter_select);
+        }
+        else if (item_rolling == 4) {
+          // read power factor
+          Serial.println("--MainTask-- Read PF");
+          m_flag = power_factor(meter_select);
+        }
+        else if (item_rolling == 5) {
+          // read kwh
+          Serial.println("--MainTask-- Read kwh");
+          m_flag = energy(meter_select);
+        }
+        else if (item_rolling == 6) {
+          // read relay status
+          Serial.println("--MainTask-- Read Relay Status");
+          m_flag = relay_status(meter_select);
+        }
+        else if (item_rolling == 7) {
+          // read temperature
+          Serial.println("--MainTask-- Read Temp");
+          m_flag = temp(meter_select);
+        }
+        else if (item_rolling == 8) {
+          // read warnings
+          Serial.println("--MainTask-- Read Warnings");
+          m_flag = warnings(meter_select);
+        }
+        else if (item_rolling == 9) {
+          Serial.println("--MainTask-- Control Coil");
+          if (coil_set == 1) {
+            // if coil need to be changed
+            if (coil_status == METER_STATUS_POWER_ON) {
+              m_flag = meter_on(meter_select);
+              Serial.print("--MainTask-- Turn Coil ON, ");
+              Serial.println(meter_num[meter_select]);
+            }
+
+            else if (coil_status == METER_STATUS_SWITCH_OFF) {
+              m_flag = meter_off(meter_select);
+              Serial.print("--MainTask-- Turn Coil Off, ");
+              Serial.println(meter_num[meter_select]);
+            }
+          }
+          else {
+            // if coil does not need to be changed
+            item_rolling = 0;
+            // meter_select ++;
+            // Add content to enable move to next meter if exists **************
+            meter_receive = 0;
+            break;
+          }
+        }
+        //meter_receive = 0;
+        if (m_flag == 1) {
+          // Send success
+          meter_task_step = METER_TASK_NORMAL_REPLY;
+          selfNextDutyDelay(OS_ST_PER_100_MS*10);
+          Serial.println("--MainTask-- Send Command OK !");
+        }
+        else {
+          // Send Fail
+          connect_retry++;
+          selfNextDutyDelay(OS_ST_PER_100_MS*5);
+          Serial.print("--MainTask-- Send to meter failed, # Retries: ");
+          Serial.println(connect_retry)
+          if (connect_retry > MAX_RETRY) {
+            Serial.println("--MainTask-- Send to meter failed, Max Retries");
+            connect_retry = 0;
+
+            item_rolling++;
+            if (item_rolling > 9) {
+              item_rolling = 0;
+              // meter_select++;
+              // Add content to enable move to next meter if exists ************
+            }
+            Serial.print("--MainTask-- Error check item number: ");
+            Serial.println(item_rolling);
+          }
+        }
+        break;
+      }
+    case METER_TASK_NORMAL_REPLY : {
+        Serial.println("--MainTask-- Check meter reply");
+        if (meter_receive >= meter_should_receive && meter_should_receive != 0) {
+          //Serial.print("--MainTask-- Get meter reply : ");
+          // receive success
+          //for (int ii = 0; ii < meter_receive; ii++) {
+          //  Serial.print(meter_receive_data[ii], HEX);
+          //  Serial.print(" ");
+          //}
+          //Serial.println();
+          if (item_rolling == 3) {
+            // amp
+            meter_box_list[meter_box_rolling].meter_list[meter_rolling].amp = stringfloat2longAmp1000(meter_receive_data + 9);
+            if ((int)meter_box_list[meter_box_rolling].meter_list[meter_rolling].amp >= OVER_CURRENT) {
+              meter_box_list[meter_box_rolling].meter_list[meter_rolling].flag = METER_STATUS_OVER_AMP_OFF;
+              protect_time_list[meter_box_rolling * METER_PER_BOX + meter_rolling] = systime;
+              meter_box_list[meter_box_rolling].meter_list[meter_rolling].exc = 1;
+              char logs[90];
+              sprintf(logs, "%ld : Over Current Detected ! METER %d in BOX %d will be switched off ", systime, meter_rolling + 1, connected_box_id);
+              saveSystemRecord(logs);
+              meter_task_step = METER_TASK_NORMAL_SEND;
+              item_rolling = 2;
+            }
+            else {
+              item_rolling = 0;
+              meter_rolling++;
+              // shift to next box
+              if (meter_rolling >= METER_PER_BOX) {
+                meter_rolling = 0;
+
+                connectionStop();
+                meter_task_step = METER_TASK_CONNECT_TO_BOX;
+                // shift to next box
+                meter_box_rolling++;
+                if (meter_box_rolling >= meter_box_number) {
+                  meter_box_rolling = 0;
+                }
+              }
+            }
+
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 0) {
+            // watt
+            meter_box_list[meter_box_rolling].meter_list[meter_rolling].watt = stringfloat2longAmp1000(meter_receive_data + 9);
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 1) {
+            // kwh
+            uint32_t kwh = stringfloat2longAmp1000(meter_receive_data + 9);
+            long gap = kwh - meter_box_list[meter_box_rolling].meter_list[meter_rolling].kwh;
+            long temp_credit = meter_box_list[meter_box_rolling].meter_list[meter_rolling].credit - (long)((gap * current_price + 50) / 100);
+            if (temp_credit <= 0) taskNextDutyDelay(meter_maintenance_task, 0); // seems no credit
+            //Serial.print("Read KWH :"); Serial.println(kwh);
+            temp_kwh_list[meter_box_rolling * METER_PER_BOX + meter_rolling] = kwh;
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 2) {
+            meter_box_list[meter_box_rolling].meter_list[meter_rolling].exc = 0;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            item_rolling = 3;
+            if (meter_receive_data[10] == 0x00) {
+
+              selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+            }
+            else {
+              // switch on check !
+              selfNextDutyDelay(OS_ST_PER_SECOND);
+            }
+          }
+          meter_box_list[meter_box_rolling].error = 0;
+          connect_retry_time = 0;
+          meter_task_step = METER_TASK_NORMAL_SEND;
+        }
+        else {
+          // receive error
+          Serial.println("--MainTask-- No reply from meter");
+          connect_retry_time++;
+          meter_task_step = METER_TASK_NORMAL_SEND;
+          selfNextDutyDelay(NEXT_COMMAND_INTERVAL + OS_ST_PER_100_MS * 2);
+          if (connect_retry_time > 2) {
+            connectionStop();
+            meter_task_step = METER_TASK_CONNECT_TO_BOX;
+          }
+          else if (connect_retry_time > MAX_RETRY) {
+            connect_retry_time = 0;
+            meter_box_list[meter_box_rolling].error = 3;
+            // empty the meter status.
+            connectionStop();
+            meter_task_step = METER_TASK_CONNECT_TO_BOX;
+            item_rolling += 1;
+            if (item_rolling > 3) {
+              item_rolling = 0;
+              meter_rolling += 1;
+              if (meter_rolling >= METER_PER_BOX) {
+                meter_rolling = 0;
+                meter_box_rolling += 1;
+                if (meter_box_rolling >= meter_box_number) {
+                  meter_box_rolling = 0; //shift to next box;
+                }
+              }
+            }
+
+          }
+        }
+
+        // if mission exists
+        if (meter_mission_number > 0) {
+          Serial.println("--MainTask-- shift to mission mode");
+          meter_task_step = METER_TASK_CONNECT_TO_BOX;
+        }
+        meter_receive = 0;
+        meter_should_receive = 0;
+        //selfNextDutyDelay(0);
+        break;
+      }
+
+    /*
+    case METER_TASK_EXC_COMMAND : {
+        if (switchCoil(meter_mission_list[current_mission].box_rank, meter_mission_list[current_mission].meter, meter_mission_list[current_mission].coil)) {
+          meter_task_step = METER_TASK_EXC_REPLY;
+          meter_box_list[connected_box_rank].error = 0;
+          selfNextDutyDelay(OS_ST_PER_100_MS * 5);
+        }
+        else {
+          connect_retry_time++;
+          connectionStop();
+          meter_task_step = METER_TASK_CONNECT_TO_BOX;
+          selfNextDutyDelay(OS_ST_PER_100_MS * 3);
+          if (connect_retry_time > MAX_RETRY) {
+            connect_retry_time = 0;
+            meter_box_list[meter_mission_list[current_mission].meter].error = 4;
+            meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].exc = 1;
+            current_mission = -1;
+            meter_mission_number--;
+          }
+        }
+        break;
+      }
+    case METER_TASK_EXC_REPLY : {
+        if (meter_receive == meter_should_receive && meter_should_receive != 0) {
+          meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].exc = 0;
+          meter_box_list[meter_mission_list[current_mission].box_rank].error = 0;
+          connect_retry_time = 0;
+          char logs[150];
+          sprintf(logs, "%lu : Mission %d execute success ! METER %d in BOX %d has been switched",
+                  systime, current_mission, meter_mission_list[current_mission].meter, meter_mission_list[current_mission].box_rank);
+          //Serial.println(logs);
+          current_mission = -1;
+          meter_mission_number--;
+          saveSystemRecord(logs);
+          meter_task_step = METER_TASK_CONNECT_TO_BOX;
+        }
+        else {
+          // receive error
+          Serial.println("--Mission-- Current Mission Fail. No reply");
+          connect_retry_time++;
+          connectionStop();
+          meter_task_step = METER_TASK_CONNECT_TO_BOX;
+          selfNextDutyDelay(OS_ST_PER_100_MS * 3);
+          if (connect_retry_time > MAX_RETRY) {
+            connect_retry_time = 0;
+            meter_box_list[meter_mission_list[current_mission].meter].error = 4;
+            meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].exc = 1;
+            //meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].coil = meter_mission_list[current_mission].coil;
+            current_mission = -1;
+            meter_mission_number--;
+          }
+        }
+        meter_receive = 0;
+        meter_should_receive = 0;
+
+        break;
+      }
+    */
+    default: {
+        break;
+      }
+  }
+  return 1;
 }
+
 /******************************** meter tasks end *********************************/
 
 // the setup function runs on reset
@@ -491,9 +802,9 @@ void setup() {
   /* initialize application task
   OS_TASK *taskRegister(unsigned int (*funP)(int opt),unsigned long interval,unsigned char status,unsigned long temp_interval)
   taskRegister(FUNCTION, INTERVAL, STATUS, TEMP_INTERVAL); */
-  //ECHO = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
-  METER_ON = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
-  METER_OFF = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
+  //Echo = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
+  Meter_On = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
+  Meter_Off = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
