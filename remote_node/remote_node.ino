@@ -106,7 +106,6 @@ uint8_t item_rolling = 0;
 // coil status
 #define METER_STATUS_POWER_OFF  0
 #define METER_STATUS_POWER_ON   1
-uint8_t coil_status = METER_STATUS_POWER_ON;
 
 // change the coil status? (initially no)
 uint8_t coil_set = 0;
@@ -117,6 +116,22 @@ uint8_t connect_retry = 0;
 // listening to how many more bytes?
 uint8_t meter_receive = 0;
 uint8_t meter_should_receive = 0;
+
+void initMeterDataStruct() {
+  memset(dynamic_memery, 0, sizeof(dynamic_memery));
+  for (int j = 0; j < meter_count; j++) {
+    meter_count[j].voltage = 0;
+    meter_count[j].amp = 0;
+    meter_count[j].frequency = 0;
+    meter_count[j].watt = 0;
+    meter_count[j].power_factor = 0;
+    meter_count[j].kwh = 0;
+    meter_count[j].relay_status = 0;
+    meter_count[j].temp = 0;
+    meter_count[j].warnings = 1;
+    meter_count[j].flag = METER_STATUS_SWITCH_ON;
+  }
+}
 
 /******************************** meter init end *********************************/
 
@@ -505,13 +520,13 @@ unsigned meterMainTask(int opt) {
           Serial.println("--MainTask-- Control Coil");
           if (coil_set == 1) {
             // if coil need to be changed
-            if (coil_status == METER_STATUS_POWER_ON) {
+            if (meter_count[meter_select].flag == METER_STATUS_POWER_ON) {
               m_flag = meter_on(meter_select);
               Serial.print("--MainTask-- Turn Coil ON, ");
               Serial.println(meter_num[meter_select]);
             }
 
-            else if (coil_status == METER_STATUS_SWITCH_OFF) {
+            else if (meter_count[meter_select].flag == METER_STATUS_SWITCH_OFF) {
               m_flag = meter_off(meter_select);
               Serial.print("--MainTask-- Turn Coil Off, ");
               Serial.println(meter_num[meter_select]);
@@ -558,6 +573,60 @@ unsigned meterMainTask(int opt) {
     case METER_TASK_NORMAL_REPLY : {
         Serial.println("--MainTask-- Check meter reply");
         if (meter_receive >= meter_should_receive && meter_should_receive != 0) {
+          if (item_rolling == 0) {
+
+          }
+          else if (item_rolling == 1) {
+            // read amp
+            meter_box_list[meter_box_rolling].meter_list[meter_rolling].watt = stringfloat2longAmp1000(meter_receive_data + 9);
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 2) {
+            // read frequency
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 3) {
+            // read watt
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 4) {
+            // read power factor
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 5) {
+            // read kwh
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 6) {
+            // read relay status
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 7) {
+            // read temperature
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+          else if (item_rolling == 8) {
+            // read warnings
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
+          }
+
+
           //Serial.print("--MainTask-- Get meter reply : ");
           // receive success
           //for (int ii = 0; ii < meter_receive; ii++) {
