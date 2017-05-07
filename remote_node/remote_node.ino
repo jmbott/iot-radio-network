@@ -3,10 +3,11 @@
 
   Remote node in radio node network
 
-  3.26.2017 - basic reciever code added, RH_RF95 class
-  3.27.2017 - echo recieved message
-  4.10.2017 - lightOS integration, meter skeleton
-  4.29.2017 - Add Meter functions
+  03.26.2017 - basic reciever code added, RH_RF95 class
+  03.27.2017 - echo recieved message
+  04.10.2017 - lightOS integration, meter skeleton
+  04.29.2017 - Add Meter functions
+  05.06.2017 - Add Main Meter Function
 
 */
 
@@ -24,6 +25,7 @@ Timer t;
 OS_TASK *Echo;
 OS_TASK *Meter_On;
 OS_TASK *Meter_Off;
+OS_TASK *Meter_Main_Task;
 
 // system time
 unsigned long systime = 0;
@@ -80,6 +82,22 @@ int meter_select = 0; // selected meter, init first meter
 // byte meter_num[meter_count] = {METER_NUMER_1,METER_NUMER_2,etc...};
 byte meter_num[meter_count] = {0x06,0x08};
 
+// Structure for stored data
+typedef struct {
+  uint32_t voltage;
+  uint32_t amp;
+  uint32_t frequency;
+  uint32_t watt;
+  uint32_t power_factor;
+  uint32_t kwh;
+  bool relay_status;
+  uint32_t temp;
+  uint32_t warnings;
+  uint8_t flag;
+} METER_TYPE;
+
+METER_TYPE meter_type[meter_count];
+
 // Serial2 setup
 Uart Serial2 (&sercom1, RX, TX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
 void SERCOM1_Handler()
@@ -116,22 +134,29 @@ uint8_t connect_retry = 0;
 // listening to how many more bytes?
 uint8_t meter_receive = 0;
 uint8_t meter_should_receive = 0;
+uint8_t temp_receive = 0;
 
+// recieved information
+uint8_t meter_receive_data[100];
+
+// stored information
 void initMeterDataStruct() {
-  memset(dynamic_memery, 0, sizeof(dynamic_memery));
   for (int j = 0; j < meter_count; j++) {
-    meter_count[j].voltage = 0;
-    meter_count[j].amp = 0;
-    meter_count[j].frequency = 0;
-    meter_count[j].watt = 0;
-    meter_count[j].power_factor = 0;
-    meter_count[j].kwh = 0;
-    meter_count[j].relay_status = 0;
-    meter_count[j].temp = 0;
-    meter_count[j].warnings = 1;
-    meter_count[j].flag = METER_STATUS_SWITCH_ON;
+    meter_type[j].voltage = 0;
+    meter_type[j].amp = 0;
+    meter_type[j].frequency = 0;
+    meter_type[j].watt = 0;
+    meter_type[j].power_factor = 0;
+    meter_type[j].kwh = 0;
+    meter_type[j].relay_status = 0;
+    meter_type[j].temp = 0;
+    meter_type[j].warnings = 1;
+    meter_type[j].flag = METER_STATUS_POWER_ON;
   }
 }
+
+// variable for switching task cases
+uint8_t meter_task_step = 0;
 
 /******************************** meter init end *********************************/
 
@@ -449,16 +474,89 @@ unsigned int meter_on(int rank) {
 }
 
 unsigned int meter_listen(int opt) {
-  while (Serial2.available()) {//Look for data from meter
-    digitalWrite(LED, HIGH);  // Show activity
-    byte Received = Serial2.read();    // Read received byte
-    Serial.println("recieved:");
-    Serial.print(Received,HEX);        // Show on Serial Monitor
-    Serial.println("");
-    delay(10);
-    digitalWrite(LED, LOW);  // Show activity
+  if (meter_should_receive - meter_receive > 0) {
+    while (Serial2.available()) {//Look for data from meter
+      digitalWrite(LED, HIGH);  // Show activity
+      int temp_recieve = Serial2.available();
+      if (meter_receive + temp_receive >= meter_should_receive) {
+        temp_receive = meter_should_receive - meter_receive;
+        taskNextDutyDelay(Meter_Main_Task, 0);
+      }
+      byte received_data = Serial2.read();    // Read received byte
+      meter_receive_data[meter_receive] = received_data;
+      Serial.println("recieved:");
+      Serial.print(received_data,HEX);        // Show on Serial Monitor
+      Serial.println("");
+      Serial.print("--MeterListening-- In Buffer: ");
+      for (int i = 0; i < meter_receive; i++){
+        Serial.print(meter_receive_data[i],HEX);
+        Serial.print(" ");
+      }
+      Serial.println(" -- ");
+      meter_receive += temp_receive;
+      delay(10);
+      digitalWrite(LED, LOW);  // Show activity
+    }
   }
   return 1;
+}
+
+long convert_two(byte data[]) {
+  byte p[2] = {0x00,0x00};
+  p[0] = data[3];
+  p[1] = data[4];
+
+  Serial.print(p[0], HEX);
+  Serial.print("  ");
+  Serial.println(p[1], HEX);
+
+  Serial.print(p[0], BIN);
+  Serial.print("  ");
+  Serial.println(p[1], BIN);
+
+  long d0 = p[0] << 8;
+  long d1 = p[1];
+  long d = d0 | d1;
+
+  Serial.println(d, BIN);
+  Serial.println(d);
+
+  return d;
+}
+
+long convert_four(byte data[]) {
+  byte p[4] = {0x00,0x00,0x00,0x00};
+  p[0] = data[3];
+  p[1] = data[4];
+  p[2] = data[5];
+  p[3] = data[6];
+
+  Serial.print(p[0], HEX);
+  Serial.print("  ");
+  Serial.print(p[1], HEX);
+  Serial.print("  ");
+  Serial.print(p[2], HEX);
+  Serial.print("  ");
+  Serial.println(p[3], HEX);
+
+  Serial.print(p[0], BIN);
+  Serial.print("  ");
+  Serial.println(p[1], BIN);
+  Serial.print("  ");
+  Serial.print(p[2], BIN);
+  Serial.print("  ");
+  Serial.println(p[3], BIN);
+
+  long d0 = p[0] << 24;
+  long d1 = p[1] << 16;
+  long d2 = p[2] << 8;
+  long d3 = p[3];
+  long d = d0 | d1 | d2 | d3;
+
+  Serial.println(d, BIN);
+  Serial.println(d);
+
+  return d;
 }
 
 unsigned meterMainTask(int opt) {
@@ -520,13 +618,13 @@ unsigned meterMainTask(int opt) {
           Serial.println("--MainTask-- Control Coil");
           if (coil_set == 1) {
             // if coil need to be changed
-            if (meter_count[meter_select].flag == METER_STATUS_POWER_ON) {
+            if (meter_type[meter_select].flag == METER_STATUS_POWER_ON) {
               m_flag = meter_on(meter_select);
               Serial.print("--MainTask-- Turn Coil ON, ");
               Serial.println(meter_num[meter_select]);
             }
 
-            else if (meter_count[meter_select].flag == METER_STATUS_SWITCH_OFF) {
+            else if (meter_type[meter_select].flag == METER_STATUS_POWER_OFF) {
               m_flag = meter_off(meter_select);
               Serial.print("--MainTask-- Turn Coil Off, ");
               Serial.println(meter_num[meter_select]);
@@ -541,7 +639,7 @@ unsigned meterMainTask(int opt) {
             break;
           }
         }
-        //meter_receive = 0;
+        meter_receive = 0;
         if (m_flag == 1) {
           // Send success
           meter_task_step = METER_TASK_NORMAL_REPLY;
@@ -553,7 +651,7 @@ unsigned meterMainTask(int opt) {
           connect_retry++;
           selfNextDutyDelay(OS_ST_PER_100_MS*5);
           Serial.print("--MainTask-- Send to meter failed, # Retries: ");
-          Serial.println(connect_retry)
+          Serial.println(connect_retry);
           if (connect_retry > MAX_RETRY) {
             Serial.println("--MainTask-- Send to meter failed, Max Retries");
             connect_retry = 0;
@@ -574,235 +672,100 @@ unsigned meterMainTask(int opt) {
         Serial.println("--MainTask-- Check meter reply");
         if (meter_receive >= meter_should_receive && meter_should_receive != 0) {
           if (item_rolling == 0) {
-
+            // read voltage
+            meter_type[meter_select].voltage = convert_two(meter_receive_data);
+            item_rolling++;
+            meter_task_step = METER_TASK_NORMAL_SEND;
+            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 1) {
             // read amp
-            meter_box_list[meter_box_rolling].meter_list[meter_rolling].watt = stringfloat2longAmp1000(meter_receive_data + 9);
+            meter_type[meter_select].amp = convert_two(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 2) {
             // read frequency
+            meter_type[meter_select].frequency = convert_two(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 3) {
             // read watt
+            meter_type[meter_select].watt = convert_two(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 4) {
             // read power factor
+            meter_type[meter_select].power_factor = convert_two(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 5) {
             // read kwh
+            meter_type[meter_select].kwh = convert_four(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 6) {
             // read relay status
+            meter_type[meter_select].relay_status = convert_two(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 7) {
             // read temperature
+            meter_type[meter_select].temp = convert_two(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
           else if (item_rolling == 8) {
             // read warnings
+            meter_type[meter_select].warnings = convert_two(meter_receive_data);
             item_rolling++;
             meter_task_step = METER_TASK_NORMAL_SEND;
             selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
           }
+          else if (item_rolling == 9) {
+            // switch relay %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+          }
 
-
-          //Serial.print("--MainTask-- Get meter reply : ");
+          Serial.print("--MainTask-- Get meter reply : ");
           // receive success
-          //for (int ii = 0; ii < meter_receive; ii++) {
-          //  Serial.print(meter_receive_data[ii], HEX);
-          //  Serial.print(" ");
-          //}
-          //Serial.println();
-          if (item_rolling == 3) {
-            // amp
-            meter_box_list[meter_box_rolling].meter_list[meter_rolling].amp = stringfloat2longAmp1000(meter_receive_data + 9);
-            if ((int)meter_box_list[meter_box_rolling].meter_list[meter_rolling].amp >= OVER_CURRENT) {
-              meter_box_list[meter_box_rolling].meter_list[meter_rolling].flag = METER_STATUS_OVER_AMP_OFF;
-              protect_time_list[meter_box_rolling * METER_PER_BOX + meter_rolling] = systime;
-              meter_box_list[meter_box_rolling].meter_list[meter_rolling].exc = 1;
-              char logs[90];
-              sprintf(logs, "%ld : Over Current Detected ! METER %d in BOX %d will be switched off ", systime, meter_rolling + 1, connected_box_id);
-              saveSystemRecord(logs);
-              meter_task_step = METER_TASK_NORMAL_SEND;
-              item_rolling = 2;
-            }
-            else {
-              item_rolling = 0;
-              meter_rolling++;
-              // shift to next box
-              if (meter_rolling >= METER_PER_BOX) {
-                meter_rolling = 0;
+          for (int ii = 0; ii < meter_receive; ii++) {
+            Serial.print(meter_receive_data[ii], HEX);
+            Serial.print(" ");
+          }
+          Serial.println();
 
-                connectionStop();
-                meter_task_step = METER_TASK_CONNECT_TO_BOX;
-                // shift to next box
-                meter_box_rolling++;
-                if (meter_box_rolling >= meter_box_number) {
-                  meter_box_rolling = 0;
-                }
-              }
-            }
-
-            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
-          }
-          else if (item_rolling == 0) {
-            // watt
-            meter_box_list[meter_box_rolling].meter_list[meter_rolling].watt = stringfloat2longAmp1000(meter_receive_data + 9);
-            item_rolling++;
-            meter_task_step = METER_TASK_NORMAL_SEND;
-            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
-          }
-          else if (item_rolling == 1) {
-            // kwh
-            uint32_t kwh = stringfloat2longAmp1000(meter_receive_data + 9);
-            long gap = kwh - meter_box_list[meter_box_rolling].meter_list[meter_rolling].kwh;
-            long temp_credit = meter_box_list[meter_box_rolling].meter_list[meter_rolling].credit - (long)((gap * current_price + 50) / 100);
-            if (temp_credit <= 0) taskNextDutyDelay(meter_maintenance_task, 0); // seems no credit
-            //Serial.print("Read KWH :"); Serial.println(kwh);
-            temp_kwh_list[meter_box_rolling * METER_PER_BOX + meter_rolling] = kwh;
-            item_rolling++;
-            meter_task_step = METER_TASK_NORMAL_SEND;
-            selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
-          }
-          else if (item_rolling == 2) {
-            meter_box_list[meter_box_rolling].meter_list[meter_rolling].exc = 0;
-            meter_task_step = METER_TASK_NORMAL_SEND;
-            item_rolling = 3;
-            if (meter_receive_data[10] == 0x00) {
-
-              selfNextDutyDelay(NEXT_COMMAND_INTERVAL);
-            }
-            else {
-              // switch on check !
-              selfNextDutyDelay(OS_ST_PER_SECOND);
-            }
-          }
-          meter_box_list[meter_box_rolling].error = 0;
-          connect_retry_time = 0;
+          connect_retry = 0;
           meter_task_step = METER_TASK_NORMAL_SEND;
         }
         else {
           // receive error
-          Serial.println("--MainTask-- No reply from meter");
-          connect_retry_time++;
+          connect_retry++;
+          Serial.print("--MainTask-- No reply from meter, Retries: ");
+          Serial.println(connect_retry);
           meter_task_step = METER_TASK_NORMAL_SEND;
           selfNextDutyDelay(NEXT_COMMAND_INTERVAL + OS_ST_PER_100_MS * 2);
-          if (connect_retry_time > 2) {
-            connectionStop();
-            meter_task_step = METER_TASK_CONNECT_TO_BOX;
-          }
-          else if (connect_retry_time > MAX_RETRY) {
-            connect_retry_time = 0;
-            meter_box_list[meter_box_rolling].error = 3;
+          if (connect_retry > MAX_RETRY) {
+            connect_retry = 0;
+            Serial.println("--MainTask-- No reply from meter, Max Retries");
             // empty the meter status.
-            connectionStop();
-            meter_task_step = METER_TASK_CONNECT_TO_BOX;
             item_rolling += 1;
-            if (item_rolling > 3) {
-              item_rolling = 0;
-              meter_rolling += 1;
-              if (meter_rolling >= METER_PER_BOX) {
-                meter_rolling = 0;
-                meter_box_rolling += 1;
-                if (meter_box_rolling >= meter_box_number) {
-                  meter_box_rolling = 0; //shift to next box;
-                }
-              }
-            }
-
-          }
-        }
-
-        // if mission exists
-        if (meter_mission_number > 0) {
-          Serial.println("--MainTask-- shift to mission mode");
-          meter_task_step = METER_TASK_CONNECT_TO_BOX;
-        }
-        meter_receive = 0;
-        meter_should_receive = 0;
-        //selfNextDutyDelay(0);
-        break;
-      }
-
-    /*
-    case METER_TASK_EXC_COMMAND : {
-        if (switchCoil(meter_mission_list[current_mission].box_rank, meter_mission_list[current_mission].meter, meter_mission_list[current_mission].coil)) {
-          meter_task_step = METER_TASK_EXC_REPLY;
-          meter_box_list[connected_box_rank].error = 0;
-          selfNextDutyDelay(OS_ST_PER_100_MS * 5);
-        }
-        else {
-          connect_retry_time++;
-          connectionStop();
-          meter_task_step = METER_TASK_CONNECT_TO_BOX;
-          selfNextDutyDelay(OS_ST_PER_100_MS * 3);
-          if (connect_retry_time > MAX_RETRY) {
-            connect_retry_time = 0;
-            meter_box_list[meter_mission_list[current_mission].meter].error = 4;
-            meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].exc = 1;
-            current_mission = -1;
-            meter_mission_number--;
+            // add content to roll back to zero here if over max item_rolling
           }
         }
         break;
       }
-    case METER_TASK_EXC_REPLY : {
-        if (meter_receive == meter_should_receive && meter_should_receive != 0) {
-          meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].exc = 0;
-          meter_box_list[meter_mission_list[current_mission].box_rank].error = 0;
-          connect_retry_time = 0;
-          char logs[150];
-          sprintf(logs, "%lu : Mission %d execute success ! METER %d in BOX %d has been switched",
-                  systime, current_mission, meter_mission_list[current_mission].meter, meter_mission_list[current_mission].box_rank);
-          //Serial.println(logs);
-          current_mission = -1;
-          meter_mission_number--;
-          saveSystemRecord(logs);
-          meter_task_step = METER_TASK_CONNECT_TO_BOX;
-        }
-        else {
-          // receive error
-          Serial.println("--Mission-- Current Mission Fail. No reply");
-          connect_retry_time++;
-          connectionStop();
-          meter_task_step = METER_TASK_CONNECT_TO_BOX;
-          selfNextDutyDelay(OS_ST_PER_100_MS * 3);
-          if (connect_retry_time > MAX_RETRY) {
-            connect_retry_time = 0;
-            meter_box_list[meter_mission_list[current_mission].meter].error = 4;
-            meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].exc = 1;
-            //meter_box_list[meter_mission_list[current_mission].box_rank].meter_list[meter_mission_list[current_mission].meter].coil = meter_mission_list[current_mission].coil;
-            current_mission = -1;
-            meter_mission_number--;
-          }
-        }
-        meter_receive = 0;
-        meter_should_receive = 0;
-
-        break;
-      }
-    */
     default: {
         break;
       }
@@ -874,6 +837,7 @@ void setup() {
   //Echo = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
   Meter_On = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
   Meter_Off = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
+  Meter_Main_Task = taskRegister(meterMainTask, 1, 1, OS_ST_PER_SECOND);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
