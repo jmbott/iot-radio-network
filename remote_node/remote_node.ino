@@ -7,7 +7,7 @@
   03.27.2017 - echo recieved message
   04.10.2017 - lightOS integration, meter skeleton
   04.29.2017 - Add Meter functions
-  05.06.2017 - Add Main Meter Function
+  05.06.2017 - Add Main Meter Task
 
 */
 
@@ -23,9 +23,9 @@ Timer t;
 
 //****task variables****//
 OS_TASK *Echo;
-OS_TASK *Meter_On;
-OS_TASK *Meter_Off;
-OS_TASK *Meter_Main_Task;
+//OS_TASK *Meter_On;
+//OS_TASK *Meter_Off;
+OS_TASK *MeterMainTask;
 
 // system time
 unsigned long systime = 0;
@@ -105,21 +105,12 @@ void SERCOM1_Handler()
   Serial2.IrqHandler();
 }
 
-// Meter Statuses
-#define BOX_TASK_IDLE           0
-#define BOX_TASK_CONNECTING     1
-#define BOX_TASK_READING        2
-
 // First Task, (Read Voltage)
 uint8_t item_rolling = 0;
 
 // Main Meter Task
-#define METER_TASK_IDEL         0
-#define METER_TASK_NORMAL_SEND  3
-#define METER_TASK_NORMAL_REPLY 4
-#define METER_TASK_EXC_COMMAND  5
-#define METER_TASK_EXC_REPLY    6
-#define METER_TASK_SET_COIL     7
+#define METER_TASK_NORMAL_SEND  0
+#define METER_TASK_NORMAL_REPLY 1
 
 // coil status
 #define METER_STATUS_POWER_OFF  0
@@ -223,7 +214,7 @@ Resp: Meter #, Read/Set, Length, Response 1, Response 2, etc, CheckSum, CheckSum
 unsigned int voltage(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x08, 0x00, 0x01, 0x04, 0x7F};
   Serial.println("Voltage");
   Serial.println("sending:");
@@ -246,7 +237,7 @@ unsigned int voltage(int rank) {
 unsigned int current(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x09, 0x00, 0x01, 0x55, 0xBF};
   Serial.println("Current");
   Serial.println("sending:");
@@ -269,7 +260,7 @@ unsigned int current(int rank) {
 unsigned int frequency(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x17, 0x00, 0x01, 0x35, 0xB9};
   Serial.println("Frequency");
   Serial.println("sending:");
@@ -292,7 +283,7 @@ unsigned int frequency(int rank) {
 unsigned int power(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x18, 0x00, 0x01, 0x05, 0xBA};
   Serial.println("Power");
   Serial.println("sending:");
@@ -315,7 +306,7 @@ unsigned int power(int rank) {
 unsigned int power_factor(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0F, 0x00, 0x01, 0xB5, 0xBE};
   Serial.println("Power Factor");
   Serial.println("sending:");
@@ -338,7 +329,7 @@ unsigned int power_factor(int rank) {
 unsigned int energy(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x11, 0x00, 0x02, 0x95, 0xB9};
   Serial.println("Total Energy");
   Serial.println("sending:");
@@ -361,7 +352,7 @@ unsigned int energy(int rank) {
 unsigned int relay_status(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0D, 0x00, 0x01, 0x14, 0x7E};
   Serial.println("Relay Status");
   Serial.println("sending:");
@@ -384,7 +375,7 @@ unsigned int relay_status(int rank) {
 unsigned int temp(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x20, 0x14, 0x00, 0x01, 0xCE, 0x79};
   Serial.println("Temperature");
   Serial.println("sending:");
@@ -407,7 +398,7 @@ unsigned int temp(int rank) {
 unsigned int warnings(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x10, 0x00, 0x01, 0x84, 0x78};
   Serial.println("Warnings");
   Serial.println("sending:");
@@ -430,7 +421,7 @@ unsigned int warnings(int rank) {
 unsigned int meter_off(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: ");Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: ");Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
   Serial.println("OFF");
   Serial.println("sending:");
@@ -453,7 +444,7 @@ unsigned int meter_off(int rank) {
 unsigned int meter_on(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.print(meter_num[rank],HEX); // Which meter
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
   byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
   Serial.println("ON");
   Serial.println("sending:");
@@ -480,7 +471,7 @@ unsigned int meter_listen(int opt) {
       int temp_recieve = Serial2.available();
       if (meter_receive + temp_receive >= meter_should_receive) {
         temp_receive = meter_should_receive - meter_receive;
-        taskNextDutyDelay(Meter_Main_Task, 0);
+        taskNextDutyDelay(MeterMainTask, 0);
       }
       byte received_data = Serial2.read();    // Read received byte
       meter_receive_data[meter_receive] = received_data;
@@ -559,15 +550,13 @@ long convert_four(byte data[]) {
   return d;
 }
 
-unsigned meterMainTask(int opt) {
+unsigned meter_main_task(int opt) {
+  //Serial.println("Meter Main Task");
   switch (meter_task_step) {
-    case METER_TASK_IDEL : {
-        break;
-      }
     case METER_TASK_NORMAL_SEND : {
         Serial.println(" ------------------------------------------------------ ");
         Serial.print("--MainTask-- Send query request to meter : ");
-        Serial.print(meter_select);
+        Serial.println(meter_select);
         int m_flag = -1;
         if (item_rolling == 0) {
           // read voltage
@@ -633,8 +622,12 @@ unsigned meterMainTask(int opt) {
           else {
             // if coil does not need to be changed
             item_rolling = 0;
-            // meter_select ++;
-            // Add content to enable move to next meter if exists **************
+            if (meter_select >= meter_count - 1) {
+              meter_select = 0;
+            }
+            else {
+              meter_select++;
+            }
             meter_receive = 0;
             break;
           }
@@ -648,19 +641,22 @@ unsigned meterMainTask(int opt) {
         }
         else {
           // Send Fail
-          connect_retry++;
           selfNextDutyDelay(OS_ST_PER_100_MS*5);
           Serial.print("--MainTask-- Send to meter failed, # Retries: ");
           Serial.println(connect_retry);
+          connect_retry++;
           if (connect_retry > MAX_RETRY) {
             Serial.println("--MainTask-- Send to meter failed, Max Retries");
             connect_retry = 0;
-
             item_rolling++;
             if (item_rolling > 9) {
               item_rolling = 0;
-              // meter_select++;
-              // Add content to enable move to next meter if exists ************
+              if (meter_select >= meter_count - 1) {
+                meter_select = 0;
+              }
+              else {
+                meter_select++;
+              }
             }
             Serial.print("--MainTask-- Error check item number: ");
             Serial.println(item_rolling);
@@ -751,16 +747,16 @@ unsigned meterMainTask(int opt) {
         }
         else {
           // receive error
-          connect_retry++;
           Serial.print("--MainTask-- No reply from meter, Retries: ");
           Serial.println(connect_retry);
+          connect_retry++;
           meter_task_step = METER_TASK_NORMAL_SEND;
           selfNextDutyDelay(NEXT_COMMAND_INTERVAL + OS_ST_PER_100_MS * 2);
           if (connect_retry > MAX_RETRY) {
             connect_retry = 0;
             Serial.println("--MainTask-- No reply from meter, Max Retries");
             // empty the meter status.
-            item_rolling += 1;
+            item_rolling++;
             // add content to roll back to zero here if over max item_rolling
           }
         }
@@ -835,9 +831,10 @@ void setup() {
   OS_TASK *taskRegister(unsigned int (*funP)(int opt),unsigned long interval,unsigned char status,unsigned long temp_interval)
   taskRegister(FUNCTION, INTERVAL, STATUS, TEMP_INTERVAL); */
   //Echo = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
-  Meter_On = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
-  Meter_Off = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
-  Meter_Main_Task = taskRegister(meterMainTask, 1, 1, OS_ST_PER_SECOND);
+  //Meter_On = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
+  //Meter_Off = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
+  //MeterMainTask = taskRegister(meter_main_task, 1, 1, OS_ST_PER_SECOND);
+  MeterMainTask = taskRegister(meter_main_task, OS_ST_PER_SECOND*30, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
