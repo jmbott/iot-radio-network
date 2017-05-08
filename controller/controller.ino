@@ -32,7 +32,7 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 //#define MESSAGE "message to node #    "
 //#define MESSAGE "1234567890abcdefghijklmnopqrstuvwxyz #" // recieves up to i
 
-#define MESSAGE {0x06, 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E}
+#define MESSAGE     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
 //                  Start x3,Length,Version,Function,MeterID,Status,ID,ID,ID,ID,Check,Check,end x3
 //                  (Length only includes non standard bits.)

@@ -3,8 +3,8 @@
 
   Remote node in radio node network
 
-  03.26.2017 - basic reciever code added, RH_RF95 class
-  03.27.2017 - echo recieved message
+  03.26.2017 - basic receiver code added, RH_RF95 class
+  03.27.2017 - echo received message
   04.10.2017 - lightOS integration, meter skeleton
   04.29.2017 - Add Meter functions
   05.06.2017 - Add Main Meter Task
@@ -61,7 +61,7 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 #define LED 13
 
 // Define default reply
-#define REPLY "message recieved"
+#define REPLY "message received"
 
 /******************************** radio init end *********************************/
 
@@ -80,9 +80,11 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 int meter_select = 0; // selected meter, init first meter
 // meter_count is the number of meters
-#define meter_count 2
+#define meter_count 1
+//#define meter_count 2
 // byte meter_num[meter_count] = {METER_NUMER_1,METER_NUMER_2,etc...};
-byte meter_num[meter_count] = {0x06,0x08};
+byte meter_num[meter_count] = {0x06};
+//byte meter_num[meter_count] = {0x06,0x08};
 
 // Structure for stored data
 typedef struct {
@@ -108,7 +110,7 @@ void SERCOM1_Handler()
 }
 
 // First Task, (Read Voltage)
-uint8_t item_rolling = 0;
+int item_rolling = 0;
 
 // Main Meter Task
 #define METER_TASK_NORMAL_SEND  0
@@ -119,18 +121,18 @@ uint8_t item_rolling = 0;
 #define METER_STATUS_POWER_ON   1
 
 // change the coil status? (initially no)
-uint8_t coil_set = 0;
+int coil_set = 0;
 
 // initialize retries at zero
-uint8_t connect_retry = 0;
+int connect_retry = 0;
 
 // listening to how many more bytes?
-uint8_t meter_receive = 0;
-uint8_t meter_should_receive = 0;
-uint8_t temp_receive = 0;
+int meter_receive = 0;
+int meter_should_receive = 0;
+int temp_receive = 0;
 
-// recieved information
-uint8_t meter_receive_data[100];
+// received information
+byte meter_receive_data[100];
 
 // stored information
 void initMeterDataStruct() {
@@ -149,7 +151,7 @@ void initMeterDataStruct() {
 }
 
 // variable for switching task cases
-uint8_t meter_task_step = 0;
+int meter_task_step = 0;
 
 /******************************** meter init end *********************************/
 
@@ -158,15 +160,15 @@ uint8_t meter_task_step = 0;
 unsigned int echo(int opt) {
   if (rf95.available())
   {
-    // Recieve incomming message
+    // Receive incomming message
     // uint8_t is a type of unsigned integer of length 8 bits
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
 
-    // if recieved signal is something
+    // if received signal is something
     if (rf95.recv(buf, &len))
     {
-      // turn led on to indicate recieved signal
+      // turn led on to indicate received signal
       digitalWrite(LED, HIGH);
       RH_RF95::printBuffer("Received: ", buf, len);
       // print in the serial monitor what was recived
@@ -185,7 +187,7 @@ unsigned int echo(int opt) {
       Serial.println("Sent a reply");
       digitalWrite(LED, LOW);
     }
-    // if recieved signal is nothing
+    // if received signal is nothing
     else
     {
       Serial.println("Receive failed");
@@ -201,15 +203,15 @@ unsigned int echo(int opt) {
 unsigned int listen_request(int opt) {
   if (rf95.available())
   {
-    // Recieve incomming message
+    // Receive incomming message
     // uint8_t is a type of unsigned integer of length 8 bits
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
 
-    // if recieved signal is something
+    // if received signal is something
     if (rf95.recv(buf, &len))
     {
-      // turn led on to indicate recieved signal
+      // turn led on to indicate received signal
       digitalWrite(LED, HIGH);
       RH_RF95::printBuffer("Received: ", buf, len);
       // print in the serial monitor what was recived
@@ -229,7 +231,7 @@ unsigned int listen_request(int opt) {
       Serial.println("Sent a reply");
       digitalWrite(LED, LOW);
     }
-    // if recieved signal is nothing
+    // if received signal is nothing
     else
     {
       Serial.println("Receive failed");
@@ -514,23 +516,30 @@ unsigned int meter_listen(int opt) {
   if (meter_should_receive - meter_receive > 0) {
     while (Serial2.available()) {//Look for data from meter
       digitalWrite(LED, HIGH);  // Show activity
-      int temp_recieve = Serial2.available();
+      //int temp_receive = Serial2.available();
+      if (Serial2.available()) {
+        temp_receive = 1;
+      }
+      Serial.print("temp_receive before: "); Serial.println(temp_receive);
       if (meter_receive + temp_receive >= meter_should_receive) {
         temp_receive = meter_should_receive - meter_receive;
         taskNextDutyDelay(MeterMainTask, 0);
       }
+      Serial.print("temp_receive after: "); Serial.println(temp_receive);
       byte received_data = Serial2.read();    // Read received byte
       meter_receive_data[meter_receive] = received_data;
-      Serial.println("recieved:");
-      Serial.print(received_data,HEX);        // Show on Serial Monitor
-      Serial.println("");
+      Serial.print("just received: ");
+      Serial.println(received_data,HEX);        // Show on Serial Monitor
+      Serial.print("# Should Receive: "); Serial.println(meter_should_receive);
+      Serial.print("# meter_received: "); Serial.println(meter_receive);
+      meter_receive += temp_receive;
       Serial.print("--MeterListening-- In Buffer: ");
       for (int i = 0; i < meter_receive; i++){
+        //Serial.print("Data Received: ");
         Serial.print(meter_receive_data[i],HEX);
         Serial.print(" ");
       }
       Serial.println(" -- ");
-      meter_receive += temp_receive;
       delay(10);
       digitalWrite(LED, LOW);  // Show activity
     }
@@ -681,13 +690,14 @@ unsigned meter_main_task(int opt) {
         meter_receive = 0;
         if (m_flag == 1) {
           // Send success
+          meter_receive = 0;
           meter_task_step = METER_TASK_NORMAL_REPLY;
           selfNextDutyDelay(OS_ST_PER_100_MS*10);
           Serial.println("--MainTask-- Send Command OK !");
         }
         else {
           // Send Fail
-          selfNextDutyDelay(OS_ST_PER_100_MS*5);
+          selfNextDutyDelay(OS_ST_PER_100_MS*10);
           Serial.print("--MainTask-- Send to meter failed, # Retries: ");
           Serial.println(connect_retry);
           connect_retry++;
@@ -880,7 +890,7 @@ void setup() {
   //Meter_On = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
   //Meter_Off = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
   //MeterMainTask = taskRegister(meter_main_task, 1, 1, OS_ST_PER_SECOND);
-  MeterMainTask = taskRegister(meter_main_task, OS_ST_PER_SECOND*30, 1, 0);
+  MeterMainTask = taskRegister(meter_main_task, OS_ST_PER_SECOND*60, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
