@@ -94,15 +94,15 @@ void loop()
   // Send a message to rf95_server
 
   // length specified here 8B max? for rf95
-  char radiopacket[8] = MESSAGE;
+  char radiopacket[16] = READ_METER;
   // number position specify, must be within packetlength and can't be spaced with none
-  itoa(packetnum++, radiopacket+8, 10);
+  itoa(packetnum++, radiopacket+16, 16);
   Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[19] = 0;
+  radiopacket[16] = 0;
 
   Serial.println("Sending..."); delay(10);
   // actual max sent length specified
-  rf95.send((uint8_t *)radiopacket, 8);
+  rf95.send((uint8_t *)radiopacket, 16);
 
   Serial.println("Waiting for packet to complete..."); delay(10);
   rf95.waitPacketSent();
@@ -120,8 +120,9 @@ void loop()
       // turn led on to indicate recieved signal
       digitalWrite(LED, HIGH);
       // print in the serial monitor what was recived
-      Serial.print("Got reply: ");
-      Serial.println((char*)buf);
+      RH_RF95::printBuffer("Received: ", buf, len);
+      //Serial.print("Got reply: ");
+      //Serial.println((char*)buf);
       // and the signal strength
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);
@@ -138,5 +139,5 @@ void loop()
   {
     Serial.println("No reply, is there a listener around?");
   }
-  delay(1000);
+  delay(5000);
 }

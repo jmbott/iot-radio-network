@@ -200,6 +200,31 @@ unsigned int echo(int opt) {
 
 /***************************** listen request task ******************************/
 
+/*{0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
+
+unsigned int repy_meter_info(int rank) {
+  Serial.println("Listen Request Task");
+  digitalWrite(LED, HIGH);  // Show activity
+  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x08, 0x00, 0x01, 0x04, 0x7F};
+  Serial.println("Voltage");
+  Serial.println("sending:");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(byteReceived[i],HEX);Serial.print(" ");
+  }
+  Serial.println("");
+
+  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
+  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
+
+  meter_should_receive = 7;
+
+  digitalWrite(LED, LOW);  // Show activity
+  delay(10);
+  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
+  return 1;
+}*/
+
 unsigned int listen_request(int opt) {
   if (rf95.available())
   {
@@ -213,22 +238,66 @@ unsigned int listen_request(int opt) {
     {
       // turn led on to indicate received signal
       digitalWrite(LED, HIGH);
-      RH_RF95::printBuffer("Received: ", buf, len);
       // print in the serial monitor what was recived
-      Serial.print("Got: ");
-      Serial.println((char*)buf);
+      RH_RF95::printBuffer("Received: ", buf, len);
+      //for (int i = 0; i < 16; i++) {
+      //  Serial.print(buf[i],HEX); Serial.print(" ");
+      //}
+      //Serial.println("");
       // and the signal strength
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);
       delay(10);
 
-      // Send a reply
-      uint8_t data[] = REPLY; // predestined response
-      rf95.send(data, sizeof(data)); // predestined response
-      //rf95.send(buf, sizeof(buf)); // echo back
-      rf95.waitPacketSent();
-      // print in serial monitor the action
-      Serial.println("Sent a reply");
+      if (buf[5] == 2) {
+        for (int i = 0; i < meter_count; i++) {
+          if (buf[6] == meter_num[i]) {
+            Serial.print("Meter: "); Serial.println(buf[6]);
+            Serial.print("Voltage: "); Serial.println(meter_type[i].voltage);
+            Serial.print("Current: "); Serial.println(meter_type[i].amp);
+            Serial.print("Hertz: "); Serial.println(meter_type[i].frequency);
+            Serial.print("Watts: "); Serial.println(meter_type[i].watt);
+            Serial.print("PF: "); Serial.println(meter_type[i].power_factor);
+            Serial.print("Energy: "); Serial.println(meter_type[i].kwh);
+            Serial.print("Relay Status: "); Serial.println(meter_type[i].relay_status);
+            Serial.print("Temp: "); Serial.println(meter_type[i].temp);
+            Serial.print("Warnings: "); Serial.println(meter_type[i].warnings);
+            Serial.print("Coil Flag: "); Serial.println(meter_type[i].flag);
+
+            // Send a reply
+            uint8_t data[24] = {
+              0xAA, 0xAA, 0xAA,       // Start Bytes
+              0x09, 0x01, 0x02,       // Length, Version, Function Echo
+              meter_num[i],
+              meter_type[i].voltage,
+              meter_type[i].amp,
+              meter_type[i].frequency,
+              meter_type[i].watt,
+              meter_type[i].power_factor,
+              meter_type[i].kwh,
+              meter_type[i].temp,
+              meter_type[i].warnings,
+              meter_type[i].flag,
+              0x01, 0x02, 0x03, 0x04, // Transmission ID, needs random
+              0xD8,                   // Checksum, needs to be calculated
+              0xFF, 0xFF, 0xFF        // End Bytes
+            };
+
+            //uint8_t data[] = REPLY; // predestined response
+            rf95.send(data, sizeof(data)); // predestined response
+            //rf95.send(buf, sizeof(buf)); // echo back
+            rf95.waitPacketSent();
+            // print in serial monitor the action
+            Serial.println("Sent a reply");
+
+          }
+        }
+      }
+
+
+      //Serial.println("Got: ");
+      //Serial.println((char*)buf);
+
       digitalWrite(LED, LOW);
     }
     // if received signal is nothing
