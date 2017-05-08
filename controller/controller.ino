@@ -30,7 +30,15 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 // Define default message
 //#define MESSAGE "message to node #    "
-#define MESSAGE "1234567890abcdefghijklmnopqrstuvwxyz #" // recieves up to i
+//#define MESSAGE "1234567890abcdefghijklmnopqrstuvwxyz #" // recieves up to i
+
+#define MESSAGE {0x06, 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E}
+
+//                  Start x3,Length,Version,Function,MeterID,Status,ID,ID,ID,ID,Check,Check,end x3
+//                  (Length only includes non standard bits.)
+#define BEACON      {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
+#define READ_METER  {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
+#define SWITCH_COIL {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
 
 // Define reply TIMEOUT
 #define TIMEOUT 1000
@@ -86,15 +94,15 @@ void loop()
   // Send a message to rf95_server
 
   // length specified here 8B max? for rf95
-  char radiopacket[39] = MESSAGE;
+  char radiopacket[8] = MESSAGE;
   // number position specify, must be within packetlength and can't be spaced with none
-  itoa(packetnum++, radiopacket+38, 10);
+  itoa(packetnum++, radiopacket+8, 10);
   Serial.print("Sending "); Serial.println(radiopacket);
   radiopacket[19] = 0;
 
   Serial.println("Sending..."); delay(10);
   // actual max sent length specified
-  rf95.send((uint8_t *)radiopacket, 50);
+  rf95.send((uint8_t *)radiopacket, 8);
 
   Serial.println("Waiting for packet to complete..."); delay(10);
   rf95.waitPacketSent();

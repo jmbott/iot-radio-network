@@ -8,6 +8,7 @@
   04.10.2017 - lightOS integration, meter skeleton
   04.29.2017 - Add Meter functions
   05.06.2017 - Add Main Meter Task
+  05.07.2017 - Add Listen for Request Task
 
 */
 
@@ -26,6 +27,7 @@ OS_TASK *Echo;
 //OS_TASK *Meter_On;
 //OS_TASK *Meter_Off;
 OS_TASK *MeterMainTask;
+OS_TASK *ListenRequest;
 
 // system time
 unsigned long systime = 0;
@@ -193,6 +195,50 @@ unsigned int echo(int opt) {
 }
 
 /******************************** echo task  end *********************************/
+
+/***************************** listen request task ******************************/
+
+unsigned int listen_request(int opt) {
+  if (rf95.available())
+  {
+    // Recieve incomming message
+    // uint8_t is a type of unsigned integer of length 8 bits
+    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+
+    // if recieved signal is something
+    if (rf95.recv(buf, &len))
+    {
+      // turn led on to indicate recieved signal
+      digitalWrite(LED, HIGH);
+      RH_RF95::printBuffer("Received: ", buf, len);
+      // print in the serial monitor what was recived
+      Serial.print("Got: ");
+      Serial.println((char*)buf);
+      // and the signal strength
+      Serial.print("RSSI: ");
+      Serial.println(rf95.lastRssi(), DEC);
+      delay(10);
+
+      // Send a reply
+      uint8_t data[] = REPLY; // predestined response
+      rf95.send(data, sizeof(data)); // predestined response
+      //rf95.send(buf, sizeof(buf)); // echo back
+      rf95.waitPacketSent();
+      // print in serial monitor the action
+      Serial.println("Sent a reply");
+      digitalWrite(LED, LOW);
+    }
+    // if recieved signal is nothing
+    else
+    {
+      Serial.println("Receive failed");
+    }
+  }
+  return 1;
+}
+
+/*************************** listen request task end ****************************/
 
 /********************************* meter tasks **********************************/
 
@@ -850,7 +896,8 @@ void loop() {
 
 void constantTask() {
   t.update();
-  echo(0);
+  //echo(0);
+  listen_request(0);
   meter_listen(0);
 }
 
