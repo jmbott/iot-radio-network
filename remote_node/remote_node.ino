@@ -225,6 +225,41 @@ unsigned int repy_meter_info(int rank) {
   return 1;
 }*/
 
+uint8_t V[4] = {0x00,0x00,0x00,0x00};
+uint8_t C[4] = {0x00,0x00,0x00,0x00};
+uint8_t H[4] = {0x00,0x00,0x00,0x00};
+uint8_t W[4] = {0x00,0x00,0x00,0x00};
+uint8_t PF[4] = {0x00,0x00,0x00,0x00};
+uint8_t K[4] = {0x00,0x00,0x00,0x00};
+uint8_t R[4] = {0x00,0x00,0x00,0x00};
+uint8_t T[4] = {0x00,0x00,0x00,0x00};
+uint8_t E[4] = {0x00,0x00,0x00,0x00};
+uint8_t F[4] = {0x00,0x00,0x00,0x00};
+
+uint8_t A[4] = {0x00,0x00,0x00,0x00};
+
+void split_four(uint32_t four) {
+
+  //static uint8_t A[4] = {0x00,0x00,0x00,0x00};
+
+  A[3] = four >> 24;
+  A[2] = four >> 16;
+  A[1] = four >>  8;
+  A[0] = four;
+
+
+  Serial.print(A[3], HEX);
+  Serial.print("  ");
+  Serial.print(A[2], HEX);
+  Serial.print("  ");
+  Serial.print(A[1], HEX);
+  Serial.print("  ");
+  Serial.println(A[0], HEX);
+
+
+  //return A;
+}
+
 unsigned int listen_request(int opt) {
   if (rf95.available())
   {
@@ -249,6 +284,7 @@ unsigned int listen_request(int opt) {
       Serial.println(rf95.lastRssi(), DEC);
       delay(10);
 
+      // Reply with collected meter information
       if (buf[5] == 2) {
         for (int i = 0; i < meter_count; i++) {
           if (buf[6] == meter_num[i]) {
@@ -264,27 +300,78 @@ unsigned int listen_request(int opt) {
             Serial.print("Warnings: "); Serial.println(meter_type[i].warnings);
             Serial.print("Coil Flag: "); Serial.println(meter_type[i].flag);
 
+            // Split each into four for transmission
+            split_four(meter_type[i].voltage);
+            V[0] = A[0];
+            V[1] = A[1];
+            split_four(meter_type[i].amp);
+            C[0] = A[0];
+            C[1] = A[1];
+            split_four(meter_type[i].frequency);
+            H[0] = A[0];
+            H[1] = A[1];
+            split_four(meter_type[i].watt);
+            W[0] = A[0];
+            W[1] = A[1];
+            split_four(meter_type[i].power_factor);
+            PF[0] = A[0];
+            PF[1] = A[1];
+            split_four(meter_type[i].kwh);
+            K[0] = A[0];
+            K[1] = A[1];
+            K[2] = A[2];
+            K[3] = A[3];
+            split_four(meter_type[i].relay_status);
+            R[0] = A[0];
+            R[1] = A[1];
+            split_four(meter_type[i].temp);
+            T[0] = A[0];
+            T[1] = A[1];
+            split_four(meter_type[i].warnings);
+            E[0] = A[0];
+            E[1] = A[1];
+            split_four(meter_type[i].flag);
+            F[0] = A[0];
+            F[1] = A[1];
+
+            Serial.println(meter_type[i].voltage,HEX);
+            Serial.println(meter_type[i].amp,HEX);
+            Serial.println(meter_type[i].frequency,HEX);
+            Serial.println(meter_type[i].watt,HEX);
+            Serial.println(meter_type[i].power_factor,HEX);
+            Serial.println(meter_type[i].kwh,HEX);
+            Serial.println(meter_type[i].relay_status,HEX);
+            Serial.println(meter_type[i].temp,HEX);
+            Serial.println(meter_type[i].warnings,HEX);
+            Serial.println(meter_type[i].flag,HEX);
+
+            /*Serial.println("");
+            Serial.print(V[1],HEX);Serial.print(" ");Serial.println(V[0],HEX);
+            Serial.println("");
+            Serial.print(H[1],HEX);Serial.print(" ");Serial.println(H[0],HEX);*/
+
             // Send a reply
-            uint8_t data[24] = {
+            uint8_t data[37] = {
               0xAA, 0xAA, 0xAA,       // Start Bytes
               0x09, 0x01, 0x02,       // Length, Version, Function Echo
               meter_num[i],
-              meter_type[i].voltage,
-              meter_type[i].amp,
-              meter_type[i].frequency,
-              meter_type[i].watt,
-              meter_type[i].power_factor,
-              meter_type[i].kwh,
-              meter_type[i].temp,
-              meter_type[i].warnings,
-              meter_type[i].flag,
+              V[1], V[0],
+              C[1], C[0],
+              H[1], H[0],
+              W[1], W[0],
+              PF[1], PF[0],
+              K[3], K[2], K[1], K[0],
+              R[1], R[0],
+              T[1], T[0],
+              E[1], E[0],
+              F[1], F[0],
               0x01, 0x02, 0x03, 0x04, // Transmission ID, needs random
               0xD8,                   // Checksum, needs to be calculated
               0xFF, 0xFF, 0xFF        // End Bytes
             };
 
             //uint8_t data[] = REPLY; // predestined response
-            rf95.send(data, sizeof(data)); // predestined response
+            rf95.send(data, sizeof(data)); // send response
             //rf95.send(buf, sizeof(buf)); // echo back
             rf95.waitPacketSent();
             // print in serial monitor the action
