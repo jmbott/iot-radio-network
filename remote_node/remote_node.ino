@@ -346,6 +346,7 @@ unsigned int listen_request(int opt) {
             F[0] = A[0];
             F[1] = A[1];
 
+            /*
             Serial.println(meter_type[i].voltage,HEX);
             Serial.println(meter_type[i].amp,HEX);
             Serial.println(meter_type[i].frequency,HEX);
@@ -356,6 +357,7 @@ unsigned int listen_request(int opt) {
             Serial.println(meter_type[i].temp,HEX);
             Serial.println(meter_type[i].warnings,HEX);
             Serial.println(meter_type[i].flag,HEX);
+            */
 
             /*Serial.println("");
             Serial.print(V[1],HEX);Serial.print(" ");Serial.println(V[0],HEX);
@@ -404,7 +406,7 @@ unsigned int listen_request(int opt) {
               meter_type[i].flag = METER_STATUS_POWER_OFF;
             }
             // Send a reply
-            uint8_t data[37] = {
+            uint8_t data[16] = {
               0xAA, 0xAA, 0xAA,       // Start Bytes
               0x09, 0x01, 0x02,       // Length, Version, Function Echo
               meter_num[i],
