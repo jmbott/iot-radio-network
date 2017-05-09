@@ -84,7 +84,7 @@ int meter_select = 0; // selected meter, init first meter
 
 // byte meter_num[meter_count] = {METER_NUMER_1,METER_NUMER_2,etc...};
 
-/*
+
 #define meter_count 1
 byte meter_num[meter_count] = {0x06};
 byte volt_check1[meter_count] = {0x04};
@@ -109,9 +109,9 @@ byte off_check1[meter_count] = {0x19};
 byte off_check2[meter_count] = {0xBE};
 byte on_check1[meter_count] = {0xD8};
 byte on_check2[meter_count] = {0x7E};
-*/
 
 
+/*
 #define meter_count 2
 byte meter_num[meter_count] = {0x05,0x0B};
 byte volt_check1[meter_count] = {0x04,0x05};
@@ -136,7 +136,7 @@ byte on_check1[meter_count] = {0xD8,0xD9};
 byte on_check2[meter_count] = {0x4D,0x63};
 byte off_check1[meter_count] = {0x19,0x18};
 byte off_check2[meter_count] = {0x8D,0xA3};
-
+*/
 
 // Structure for stored data
 typedef struct {
@@ -451,10 +451,13 @@ unsigned int listen_request(int opt) {
         for (int i = 0; i < meter_count; i++) {
           if (buf[6] == meter_num[i]) {
             coil_set = 1;
+            Serial.print("Coil Set: "); Serial.println(coil_set);
             if (buf[7] == 1) {
+              Serial.println("Power On Flag Set");
               meter_type[i].flag = METER_STATUS_POWER_ON;
             }
             else if (buf[7] == 0) {
+              Serial.println("Power Off Flag Set");
               meter_type[i].flag = METER_STATUS_POWER_OFF;
             }
             // Send a reply
@@ -472,6 +475,7 @@ unsigned int listen_request(int opt) {
             // print in serial monitor the action
             Serial.println("Sent a reply");
             digitalWrite(LED, LOW);
+            //selfNextDutyDelay(OS_ST_PER_100_MS*3);
           }
         }
       }
@@ -910,6 +914,7 @@ unsigned meter_main_task(int opt) {
         }
         else if (item_rolling == 9) {
           Serial.println("--MainTask-- Control Coil");
+          Serial.print("Coil Set: ");Serial.println(coil_set);
           if (coil_set == 1) {
             // if coil need to be changed
             if (meter_type[meter_select].flag == METER_STATUS_POWER_ON) {
@@ -923,6 +928,7 @@ unsigned meter_main_task(int opt) {
               Serial.print("--MainTask-- Turn Coil Off, ");
               Serial.println(meter_num[meter_select]);
             }
+            coil_set = 0;
           }
           else {
             // if coil does not need to be changed
@@ -944,7 +950,6 @@ unsigned meter_main_task(int opt) {
           meter_task_step = METER_TASK_NORMAL_REPLY;
           selfNextDutyDelay(OS_ST_PER_100_MS*10);
           Serial.println("--MainTask-- Send Command OK !");
-          coil_set = 0;
         }
         else {
           // Send Fail

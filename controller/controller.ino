@@ -21,8 +21,7 @@ Timer t;
 
 //****task variables****//
 OS_TASK *Echo;
-OS_TASK *SwitchOff;
-OS_TASK *SwitchOn;
+OS_TASK *RFTransmit;
 //OS_TASK *ListenRadio;
 OS_TASK *WebServer;
 
@@ -70,12 +69,12 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 #define SWITCH_COIL_ON    2
 #define SWITCH_COIL_OFF   3
 
-/*
 #define beacon {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
 #define read_meter {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
 #define switch_on {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
 #define switch_off {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
-*/
+
+int rf_message_type = -1;
 
 // Define reply TIMEOUT
 #define TIMEOUT_REPLY 1000
@@ -83,6 +82,49 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 int16_t packetnum = 0;  // packet counter, we increment per transmission
 
 /******************************** radio init end *********************************/
+
+/********************************* memory init **********************************/
+
+// coil status
+#define METER_STATUS_POWER_OFF  0
+#define METER_STATUS_POWER_ON   1
+
+#define meter_count 3
+byte meter_num[meter_count] = {0x06,0x05,0x0B};
+
+// Structure for stored data
+typedef struct {
+  uint32_t voltage;
+  uint32_t amp;
+  uint32_t frequency;
+  uint32_t watt;
+  uint32_t power_factor;
+  uint32_t kwh;
+  bool relay_status;
+  uint32_t temp;
+  uint32_t warnings;
+  uint8_t flag;
+} METER_TYPE;
+
+METER_TYPE meter_type[meter_count];
+
+// stored information
+void initMeterDataStruct() {
+  for (int j = 0; j < meter_count; j++) {
+    meter_type[j].voltage = 0;
+    meter_type[j].amp = 0;
+    meter_type[j].frequency = 0;
+    meter_type[j].watt = 0;
+    meter_type[j].power_factor = 0;
+    meter_type[j].kwh = 0;
+    meter_type[j].relay_status = 0;
+    meter_type[j].temp = 0;
+    meter_type[j].warnings = 1;
+    meter_type[j].flag = METER_STATUS_POWER_ON;
+  }
+}
+
+/******************************* memory init end ********************************/
 
 /******************************** ethernet init *********************************/
 
@@ -150,71 +192,205 @@ unsigned int echo(int opt) {
 
 /******************************** Send RF tasks *********************************/
 
-unsigned int radio_transmit(int option) {
+unsigned int radio_transmit(int opt) {
 
-  byte MESSAGE[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-  if (option == BEACON) {
-    //MESSAGE = beacon;
-    byte MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-  }
-  else if (option == READ_METER) {
-    //MESSAGE = read_meter;
-    byte MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-  }
-  else if (option == SWITCH_COIL_ON) {
-    //MESSAGE = switch_on;
-    byte MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-  }
-  else if (option == SWITCH_COIL_OFF) {
-    //MESSAGE = switch_off;
-    byte MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-  }
+  //char MESSAGE[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
   // Send a message to rf95_server
   Serial.println("Sending to rf95_server");
 
-  // length specified here 8B max? for rf95
-  char radiopacket[16] = MESSAGE;
-  // number position specify, must be within packetlength and can't be spaced with none
-  itoa(packetnum++, radiopacket+16, 16);
-  Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[16] = 0;
+  if (rf_message_type == BEACON) {
+    // length specified here 8B max? for rf95
+    char radiopacket[16] = beacon;
+    //MESSAGE = beacon;
+    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
+    // number position specify, must be within packetlength and can't be spaced with none
+    itoa(packetnum++, radiopacket+16, 16);
+    Serial.print("Sending "); Serial.println(radiopacket);
+    radiopacket[16] = 0;
 
-  Serial.println("Sending..."); delay(10);
-  // actual max sent length specified
-  rf95.send((uint8_t *)radiopacket, 16);
+    Serial.println("Sending..."); delay(10);
+    // actual max sent length specified
+    rf95.send((uint8_t *)radiopacket, 16);
 
-  Serial.println("Waiting for packet to complete..."); delay(10);
-  rf95.waitPacketSent();
-  // Now wait for a reply
-  uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  uint8_t len = sizeof(buf);
-  Serial.println("Waiting for reply..."); delay(10);
-  // if recieved signal is something
-  if (rf95.waitAvailableTimeout(TIMEOUT_REPLY)) {
-    // Should be a reply message for us now
-    if (rf95.recv(buf, &len)) {
-      // turn led on to indicate recieved signal
-      digitalWrite(LED, HIGH);
-      // print in the serial monitor what was recived
-      RH_RF95::printBuffer("Received: ", buf, len);
-      //Serial.print("Got reply: ");
-      //Serial.println((char*)buf);
-      // and the signal strength
-      Serial.print("RSSI: ");
-      Serial.println(rf95.lastRssi(), DEC);
-      digitalWrite(LED, LOW);
+    Serial.println("Waiting for packet to complete..."); delay(10);
+    rf95.waitPacketSent();
+    // Now wait for a reply
+    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+    Serial.println("Waiting for reply..."); delay(10);
+    // if recieved signal is something
+    if (rf95.waitAvailableTimeout(TIMEOUT_REPLY)) {
+      // Should be a reply message for us now
+      if (rf95.recv(buf, &len)) {
+        // turn led on to indicate recieved signal
+        digitalWrite(LED, HIGH);
+        // print in the serial monitor what was recived
+        RH_RF95::printBuffer("Received: ", buf, len);
+        //Serial.print("Got reply: ");
+        //Serial.println((char*)buf);
+        // and the signal strength
+        Serial.print("RSSI: ");
+        Serial.println(rf95.lastRssi(), DEC);
+        digitalWrite(LED, LOW);
+      }
+      // if recieved signal is nothing
+      else {
+        Serial.println("Receive failed");
+      }
     }
-    // if recieved signal is nothing
+    // if no reply
     else {
-      Serial.println("Receive failed");
+      Serial.println("No reply, is there a listener around?");
     }
   }
-  // if no reply
-  else {
-    Serial.println("No reply, is there a listener around?");
+  else if (rf_message_type == READ_METER) {
+    // length specified here 8B max? for rf95
+    char radiopacket[16] = read_meter;
+    //MESSAGE = read_meter;
+    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
+    // number position specify, must be within packetlength and can't be spaced with none
+    itoa(packetnum++, radiopacket+16, 16);
+    Serial.print("Sending "); Serial.println(radiopacket);
+    radiopacket[16] = 0;
+
+    Serial.println("Sending..."); delay(10);
+    // actual max sent length specified
+    rf95.send((uint8_t *)radiopacket, 16);
+
+    Serial.println("Waiting for packet to complete..."); delay(10);
+    rf95.waitPacketSent();
+    // Now wait for a reply
+    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+    Serial.println("Waiting for reply..."); delay(10);
+    // if recieved signal is something
+    if (rf95.waitAvailableTimeout(TIMEOUT_REPLY)) {
+      // Should be a reply message for us now
+      if (rf95.recv(buf, &len)) {
+        // turn led on to indicate recieved signal
+        digitalWrite(LED, HIGH);
+        // print in the serial monitor what was recived
+        RH_RF95::printBuffer("Received: ", buf, len);
+        //Serial.print("Got reply: ");
+        //Serial.println((char*)buf);
+        // and the signal strength
+        Serial.print("RSSI: ");
+        Serial.println(rf95.lastRssi(), DEC);
+        digitalWrite(LED, LOW);
+      }
+      // if recieved signal is nothing
+      else {
+        Serial.println("Receive failed");
+      }
+    }
+    // if no reply
+    else {
+      Serial.println("No reply, is there a listener around?");
+    }
   }
+  else if (rf_message_type == SWITCH_COIL_ON) {
+    // length specified here 8B max? for rf95
+    char radiopacket[16] = switch_on;
+    //MESSAGE = switch_on;
+    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
+    // number position specify, must be within packetlength and can't be spaced with none
+    itoa(packetnum++, radiopacket+16, 16);
+    Serial.print("Sending "); Serial.println(radiopacket);
+    radiopacket[16] = 0;
+
+    Serial.println("Sending..."); delay(10);
+    // actual max sent length specified
+    rf95.send((uint8_t *)radiopacket, 16);
+
+    Serial.println("Waiting for packet to complete..."); delay(10);
+    rf95.waitPacketSent();
+    // Now wait for a reply
+    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+    Serial.println("Waiting for reply..."); delay(10);
+    // if recieved signal is something
+    if (rf95.waitAvailableTimeout(TIMEOUT_REPLY)) {
+      // Should be a reply message for us now
+      if (rf95.recv(buf, &len)) {
+        // turn led on to indicate recieved signal
+        digitalWrite(LED, HIGH);
+        // print in the serial monitor what was recived
+        RH_RF95::printBuffer("Received: ", buf, len);
+        //Serial.print("Got reply: ");
+        //Serial.println((char*)buf);
+        // and the signal strength
+        Serial.print("RSSI: ");
+        Serial.println(rf95.lastRssi(), DEC);
+        digitalWrite(LED, LOW);
+      }
+      // if recieved signal is nothing
+      else {
+        Serial.println("Receive failed");
+      }
+    }
+    // if no reply
+    else {
+      Serial.println("No reply, is there a listener around?");
+    }
+  }
+  else if (rf_message_type == SWITCH_COIL_OFF) {
+    // length specified here 8B max? for rf95
+    char radiopacket[16] = switch_off;
+    //MESSAGE = switch_off;
+    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
+    // number position specify, must be within packetlength and can't be spaced with none
+    itoa(packetnum++, radiopacket+16, 16);
+    Serial.print("Sending "); Serial.println(radiopacket);
+    radiopacket[16] = 0;
+
+    Serial.println("Sending..."); delay(10);
+    // actual max sent length specified
+    rf95.send((uint8_t *)radiopacket, 16);
+
+    Serial.println("Waiting for packet to complete..."); delay(10);
+    rf95.waitPacketSent();
+    // Now wait for a reply
+    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+    Serial.println("Waiting for reply..."); delay(10);
+    // if recieved signal is something
+    if (rf95.waitAvailableTimeout(TIMEOUT_REPLY)) {
+      // Should be a reply message for us now
+      if (rf95.recv(buf, &len)) {
+        // turn led on to indicate recieved signal
+        digitalWrite(LED, HIGH);
+        // print in the serial monitor what was recived
+        RH_RF95::printBuffer("Received: ", buf, len);
+        //Serial.print("Got reply: ");
+        //Serial.println((char*)buf);
+        // and the signal strength
+        Serial.print("RSSI: ");
+        Serial.println(rf95.lastRssi(), DEC);
+        digitalWrite(LED, LOW);
+      }
+      // if recieved signal is nothing
+      else {
+        Serial.println("Receive failed");
+      }
+    }
+    // if no reply
+    else {
+      Serial.println("No reply, is there a listener around?");
+    }
+  }
+  return 1;
+}
+
+unsigned int switch_on(int opt) {
+  rf_message_type = 2;
+  radio_transmit();
+  return 1;
+}
+
+unsigned int switch_off(int opt) {
+  rf_message_type = 3;
+  radio_transmit();
   return 1;
 }
 
@@ -271,8 +447,7 @@ void setup() {
   OS_TASK *taskRegister(unsigned int (*funP)(int opt),unsigned long interval,unsigned char status,unsigned long temp_interval)
   taskRegister(FUNCTION, INTERVAL, STATUS, TEMP_INTERVAL); */
   //Echo = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
-  SwitchOn = taskRegister(radio_transmit(2), OS_ST_PER_SECOND*10, 1, OS_ST_PER_SECOND*5);
-  SwitchOff = taskRegister(radio_transmit(3), OS_ST_PER_SECOND*10, 1, 0);
+  RFTransmit = taskRegister(radio_transmit, OS_ST_PER_SECOND*10, 1, OS_ST_PER_SECOND*5);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
@@ -289,6 +464,7 @@ void loop() {
 void constantTask() {
   t.update();
   //echo(0);
+  //radio_transmit(SWITCH_COIL_OFF); // overload
 }
 
 // support Function onDutyTime: support function for task management

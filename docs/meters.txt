@@ -1,0 +1,24 @@
+
+voltage         05 03 00 08 00 01 04 4C
+amp             05 03 00 09 00 01 55 8C
+frequency       05 03 00 17 00 01 35 8A
+watt            05 03 00 18 00 01 05 89
+power_factor    05 03 00 0F 00 01 B5 8D
+kwh             05 03 00 11 00 02 95 8A
+relay_status    05 03 00 0D 00 01 14 4D
+temp            05 03 20 14 00 01 CE 4A
+warnings        05 03 00 10 00 01 84 4B
+on              05 06 00 0D 00 01 D8 4D
+off             05 06 00 0D 00 00 19 8D
+
+voltage         0B 03 00 08 00 01 05 62
+amp             0B 03 00 09 00 01 54 A2
+frequency       0B 03 00 17 00 01 34 A4
+watt            0B 03 00 18 00 01 04 A7
+power_factor    0B 03 00 0F 00 01 B4 A3
+kwh             0B 03 00 11 00 02 94 A4
+relay_status    0B 03 00 0D 00 01 15 63
+temp            0B 03 20 14 00 01 CF 64
+warnings        0B 03 00 10 00 01 85 65
+on              0B 06 00 0D 00 01 D9 63
+off             0B 06 00 0D 00 00 18 A3
