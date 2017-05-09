@@ -247,7 +247,7 @@ void split_four(uint32_t four) {
   A[1] = four >>  8;
   A[0] = four;
 
-
+  /*
   Serial.print(A[3], HEX);
   Serial.print("  ");
   Serial.print(A[2], HEX);
@@ -255,7 +255,7 @@ void split_four(uint32_t four) {
   Serial.print(A[1], HEX);
   Serial.print("  ");
   Serial.println(A[0], HEX);
-
+  */
 
   //return A;
 }
@@ -283,7 +283,19 @@ unsigned int listen_request(int opt) {
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);
       delay(10);
-
+      // Echo back Beacon
+      if (buf[5] == 1) {
+        for (int i = 0; i < meter_count; i++) {
+          if (buf[6] == meter_num[i]) {
+            // Send a reply
+            rf95.send(buf, sizeof(buf)); // echo back
+            rf95.waitPacketSent();
+            // print in serial monitor the action
+            Serial.println("Sent a reply");
+            digitalWrite(LED, LOW);
+          }
+        }
+      }
       // Reply with collected meter information
       if (buf[5] == 2) {
         for (int i = 0; i < meter_count; i++) {
@@ -380,7 +392,35 @@ unsigned int listen_request(int opt) {
           }
         }
       }
-
+      // Switch Coil
+      if (buf[5] == 3) {
+        for (int i = 0; i < meter_count; i++) {
+          if (buf[6] == meter_num[i]) {
+            coil_set = 1;
+            if (buf[7] == 1) {
+              meter_type[i].flag = METER_STATUS_POWER_ON;
+            }
+            else if (buf[7] == 0) {
+              meter_type[i].flag = METER_STATUS_POWER_OFF;
+            }
+            // Send a reply
+            uint8_t data[37] = {
+              0xAA, 0xAA, 0xAA,       // Start Bytes
+              0x09, 0x01, 0x02,       // Length, Version, Function Echo
+              meter_num[i],
+              buf[7],                 // echo back status to confirm
+              0x01, 0x02, 0x03, 0x04, // Transmission ID, needs random
+              0xD8,                   // Checksum, needs to be calculated
+              0xFF, 0xFF, 0xFF        // End Bytes
+            };
+            rf95.send(data, sizeof(data)); // send response
+            rf95.waitPacketSent();
+            // print in serial monitor the action
+            Serial.println("Sent a reply");
+            digitalWrite(LED, LOW);
+          }
+        }
+      }
 
       //Serial.println("Got: ");
       //Serial.println((char*)buf);
