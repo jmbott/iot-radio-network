@@ -9,6 +9,7 @@
   04.29.2017 - Add Meter functions
   05.06.2017 - Add Main Meter Task
   05.07.2017 - Add Listen for Request Task
+  05.08.2017 - Add Listen for Coil Set
 
 */
 
@@ -80,11 +81,62 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 int meter_select = 0; // selected meter, init first meter
 // meter_count is the number of meters
-#define meter_count 1
-//#define meter_count 2
+
 // byte meter_num[meter_count] = {METER_NUMER_1,METER_NUMER_2,etc...};
+
+/*
+#define meter_count 1
 byte meter_num[meter_count] = {0x06};
-//byte meter_num[meter_count] = {0x06,0x08};
+byte volt_check1[meter_count] = {0x04};
+byte volt_check2[meter_count] = {0x7F};
+byte amp_check1[meter_count] = {0x55};
+byte amp_check2[meter_count] = {0xBF};
+byte freq_check1[meter_count] = {0x35};
+byte freq_check2[meter_count] = {0xB9};
+byte watt_check1[meter_count] = {0x05};
+byte watt_check2[meter_count] = {0xBA};
+byte pf_check1[meter_count] = {0xB5};
+byte pf_check2[meter_count] = {0xBE};
+byte kwh_check1[meter_count] = {0x95};
+byte kwh_check2[meter_count] = {0xB9};
+byte rs_check1[meter_count] = {0x14};
+byte rs_check2[meter_count] = {0x7E};
+byte temp_check1[meter_count] = {0xCE};
+byte temp_check2[meter_count] = {0x79};
+byte warn_check1[meter_count] = {0x84};
+byte warn_check2[meter_count] = {0x78};
+byte off_check1[meter_count] = {0x19};
+byte off_check2[meter_count] = {0xBE};
+byte on_check1[meter_count] = {0xD8};
+byte on_check2[meter_count] = {0x7E};
+*/
+
+
+#define meter_count 2
+byte meter_num[meter_count] = {0x05,0x0B};
+byte volt_check1[meter_count] = {0x04,0x05};
+byte volt_check2[meter_count] = {0x4C,0x62};
+byte amp_check1[meter_count] = {0x55,0x54};
+byte amp_check2[meter_count] = {0x8C,0xA2};
+byte freq_check1[meter_count] = {0x35,0x34};
+byte freq_check2[meter_count] = {0x8A,0xA4};
+byte watt_check1[meter_count] = {0x05,0x04};
+byte watt_check2[meter_count] = {0x89,0xA7};
+byte pf_check1[meter_count] = {0xB5,0xB4};
+byte pf_check2[meter_count] = {0x8D,0xA3};
+byte kwh_check1[meter_count] = {0x95,0x94};
+byte kwh_check2[meter_count] = {0x8A,0xA4};
+byte rs_check1[meter_count] = {0x14,0x15};
+byte rs_check2[meter_count] = {0x4D,0x63};
+byte temp_check1[meter_count] = {0xCE,0xCF};
+byte temp_check2[meter_count] = {0x4A,0x64};
+byte warn_check1[meter_count] = {0x84,0x85};
+byte warn_check2[meter_count] = {0x4B,0x65};
+byte on_check1[meter_count] = {0xD8,0xD9};
+byte on_check2[meter_count] = {0x4D,0x63};
+byte off_check1[meter_count] = {0x19,0x18};
+byte off_check2[meter_count] = {0x8D,0xA3};
+
 
 // Structure for stored data
 typedef struct {
@@ -196,7 +248,7 @@ unsigned int echo(int opt) {
   return 1;
 }
 
-/******************************** echo task  end *********************************/
+/******************************** echo task end *********************************/
 
 /***************************** listen request task ******************************/
 
@@ -367,7 +419,7 @@ unsigned int listen_request(int opt) {
             // Send a reply
             uint8_t data[37] = {
               0xAA, 0xAA, 0xAA,       // Start Bytes
-              0x09, 0x01, 0x02,       // Length, Version, Function Echo
+              0x16, 0x01, 0x02,       // Length, Version, Function Echo
               meter_num[i],
               V[1], V[0],
               C[1], C[0],
@@ -408,8 +460,8 @@ unsigned int listen_request(int opt) {
             // Send a reply
             uint8_t data[16] = {
               0xAA, 0xAA, 0xAA,       // Start Bytes
-              0x09, 0x01, 0x02,       // Length, Version, Function Echo
-              meter_num[i],
+              0x01, 0x01, 0x03,       // Length, Version, Function Echo
+              meter_num[i],           // Meter Number
               buf[7],                 // echo back status to confirm
               0x01, 0x02, 0x03, 0x04, // Transmission ID, needs random
               0xD8,                   // Checksum, needs to be calculated
@@ -461,7 +513,7 @@ unsigned int voltage(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x08, 0x00, 0x01, 0x04, 0x7F};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x08, 0x00, 0x01, volt_check1[rank], volt_check2[rank]};
   Serial.println("Voltage");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -484,7 +536,7 @@ unsigned int current(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x09, 0x00, 0x01, 0x55, 0xBF};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x09, 0x00, 0x01, amp_check1[rank], amp_check2[rank]};
   Serial.println("Current");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -507,7 +559,7 @@ unsigned int frequency(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x17, 0x00, 0x01, 0x35, 0xB9};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x17, 0x00, 0x01, freq_check1[rank], freq_check2[rank]};
   Serial.println("Frequency");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -530,7 +582,7 @@ unsigned int power(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x18, 0x00, 0x01, 0x05, 0xBA};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x18, 0x00, 0x01, watt_check1[rank], watt_check2[rank]};
   Serial.println("Power");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -553,7 +605,7 @@ unsigned int power_factor(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0F, 0x00, 0x01, 0xB5, 0xBE};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0F, 0x00, 0x01, pf_check1[rank], pf_check2[rank]};
   Serial.println("Power Factor");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -576,7 +628,7 @@ unsigned int energy(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x11, 0x00, 0x02, 0x95, 0xB9};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x11, 0x00, 0x02, kwh_check1[rank], kwh_check2[rank]};
   Serial.println("Total Energy");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -599,7 +651,7 @@ unsigned int relay_status(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0D, 0x00, 0x01, 0x14, 0x7E};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x0D, 0x00, 0x01, rs_check1[rank], rs_check2[rank]};
   Serial.println("Relay Status");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -622,7 +674,7 @@ unsigned int temp(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x20, 0x14, 0x00, 0x01, 0xCE, 0x79};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x20, 0x14, 0x00, 0x01, temp_check1[rank], temp_check2[rank]};
   Serial.println("Temperature");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -645,7 +697,7 @@ unsigned int warnings(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x10, 0x00, 0x01, 0x84, 0x78};
+  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x10, 0x00, 0x01, warn_check1[rank], warn_check2[rank]};
   Serial.println("Warnings");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -668,7 +720,7 @@ unsigned int meter_off(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: ");Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x00, 0x19, 0xBE};
+  byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x00, off_check1[rank], off_check2[rank]};
   Serial.println("OFF");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -691,7 +743,7 @@ unsigned int meter_on(int rank) {
   Serial.println("Meter Task");
   digitalWrite(LED, HIGH);  // Show activity
   Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x01, 0xD8, 0x7E};
+  byte byteReceived[8] = {meter_num[rank], 0x06, 0x00, 0x0D, 0x00, 0x01, on_check1[rank], on_check2[rank]};
   Serial.println("ON");
   Serial.println("sending:");
   for (int i = 0; i < 8; i++) {
@@ -892,6 +944,7 @@ unsigned meter_main_task(int opt) {
           meter_task_step = METER_TASK_NORMAL_REPLY;
           selfNextDutyDelay(OS_ST_PER_100_MS*10);
           Serial.println("--MainTask-- Send Command OK !");
+          coil_set = 0;
         }
         else {
           // Send Fail
