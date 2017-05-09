@@ -1086,7 +1086,7 @@ void setup() {
   //Meter_On = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
   //Meter_Off = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
   //MeterMainTask = taskRegister(meter_main_task, 1, 1, OS_ST_PER_SECOND);
-  MeterMainTask = taskRegister(meter_main_task, OS_ST_PER_SECOND*60, 1, 0);
+  MeterMainTask = taskRegister(meter_main_task, OS_ST_PER_SECOND*30, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
