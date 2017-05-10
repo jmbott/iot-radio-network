@@ -1,6 +1,0 @@
-For compile,
-
-* need M0 board files
-
-* Ethernet2 library
-* LightOS library
