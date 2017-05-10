@@ -192,49 +192,49 @@ unsigned int echo(int opt) {
 
 long convert_two(byte data1, byte data2) {
   byte p[2] = {0x00,0x00};
-  p[0] = data1;
-  p[1] = data2;
+  p[0] = data2;
+  p[1] = data1;
 
-  Serial.print(p[0], HEX);
+  /*Serial.print(p[0], HEX);
   Serial.print("  ");
-  Serial.println(p[1], HEX);
+  Serial.println(p[1], HEX);*/
 
-  Serial.print(p[0], BIN);
+  /*Serial.print(p[0], BIN);
   Serial.print("  ");
-  Serial.println(p[1], BIN);
+  Serial.println(p[1], BIN);*/
 
   long d0 = p[0] << 8;
   long d1 = p[1];
   long d = d0 | d1;
 
-  Serial.println(d, BIN);
-  Serial.println(d);
+  /*Serial.println(d, BIN);
+  Serial.println(d);*/
 
   return d;
 }
 
 long convert_four(byte data1, byte data2, byte data3, byte data4) {
   byte p[4] = {0x00,0x00,0x00,0x00};
-  p[0] = data1;
-  p[1] = data2;
-  p[2] = data3;
-  p[3] = data4;
+  p[0] = data4;
+  p[1] = data3;
+  p[2] = data2;
+  p[3] = data1;
 
-  Serial.print(p[0], HEX);
+  /*Serial.print(p[0], HEX);
   Serial.print("  ");
   Serial.print(p[1], HEX);
   Serial.print("  ");
   Serial.print(p[2], HEX);
   Serial.print("  ");
-  Serial.println(p[3], HEX);
+  Serial.println(p[3], HEX);*/
 
-  Serial.print(p[0], BIN);
+  /*Serial.print(p[0], BIN);
   Serial.print("  ");
   Serial.println(p[1], BIN);
   Serial.print("  ");
   Serial.print(p[2], BIN);
   Serial.print("  ");
-  Serial.println(p[3], BIN);
+  Serial.println(p[3], BIN);*/
 
   long d0 = p[0] << 24;
   long d1 = p[1] << 16;
@@ -242,8 +242,8 @@ long convert_four(byte data1, byte data2, byte data3, byte data4) {
   long d3 = p[3];
   long d = d0 | d1 | d2 | d3;
 
-  Serial.println(d, BIN);
-  Serial.println(d);
+  /*Serial.println(d, BIN);
+  Serial.println(d);*/
 
   return d;
 }
@@ -328,15 +328,17 @@ unsigned int radio_transmit(int rank) {
         digitalWrite(LED, HIGH);
         // print in the serial monitor what was recived
         RH_RF95::printBuffer("Received: ", buf, len);
-        meter_type[meter_num[rank]].voltage = convert_two(buf[8],buf[7]);
-        meter_type[meter_num[rank]].amp = convert_two(buf[10],buf[9]);
-        meter_type[meter_num[rank]].frequency = convert_two(buf[12],buf[11]);
-        meter_type[meter_num[rank]].watt = convert_two(buf[14],buf[13]);
-        meter_type[meter_num[rank]].power_factor = convert_two(buf[16],buf[15]);
-        meter_type[meter_num[rank]].kwh = convert_four(buf[20],buf[19],buf[18],buf[17]);
-        meter_type[meter_num[rank]].relay_status = convert_two(buf[22],buf[21]);
-        meter_type[meter_num[rank]].temp = convert_two(buf[24],buf[23]);
-        meter_type[meter_num[rank]].warnings = convert_two(buf[26],buf[25]);
+        //Serial.println(buf[7],HEX);
+        //Serial.println(buf[8],HEX);
+        meter_type[rank].voltage = convert_two(buf[8],buf[7]);
+        meter_type[rank].amp = convert_two(buf[10],buf[9]);
+        meter_type[rank].frequency = convert_two(buf[12],buf[11]);
+        meter_type[rank].watt = convert_two(buf[14],buf[13]);
+        meter_type[rank].power_factor = convert_two(buf[16],buf[15]);
+        meter_type[rank].kwh = convert_four(buf[20],buf[19],buf[18],buf[17]);
+        meter_type[rank].relay_status = convert_two(buf[22],buf[21]);
+        meter_type[rank].temp = convert_two(buf[24],buf[23]);
+        meter_type[rank].warnings = convert_two(buf[26],buf[25]);
         //Serial.print("Got reply: ");
         //Serial.println((char*)buf);
         // and the signal strength
