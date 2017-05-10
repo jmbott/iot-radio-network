@@ -24,7 +24,7 @@ EthernetServer server(8080);
 char HTTP_req[REQ_BUF_SZ] = {0}; // buffered HTTP request stored as null terminated string
 char req_index = 0;              // index into HTTP_req buffer
 
-String readString; 
+String readString;
 int ledPin = 13;
 
 int meter1 = 0;
@@ -50,7 +50,7 @@ void setup() {
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);//, dnServer, gateway, subnet
-  pinMode(ledPin, OUTPUT); //pin selected to control 
+  pinMode(ledPin, OUTPUT); //pin selected to control
   server.begin();
   Serial.print("server is at ");
   Serial.println(Ethernet.localIP());
@@ -69,6 +69,10 @@ void loop() {
 // this method makes a HTTP connection to the server:
 void httpRequest() {
 
+  // switch from radio to ethernet
+  pinMode(8, OUTPUT);
+  digitalWrite(8, HIGH);
+
   // listen for incoming clients
   EthernetClient client = server.available();
 
@@ -83,8 +87,8 @@ void httpRequest() {
          req_index++;
        }
        if (readString.length() < 100) {
-                    //store characters to string 
-                    readString += c; 
+                    //store characters to string
+                    readString += c;
                 }
 
         // if you've gotten to the end of the line (received a newline
@@ -164,26 +168,26 @@ client.println("gauge2.value = 0;");
 client.println("gauge3.value = 0;");
 client.println("</script>");
                     client.println("METER1:");
-                    client.println("<a href=\"/?LEDON1\"\">On</a>"); 
+                    client.println("<a href=\"/?LEDON1\"\">On</a>");
                     client.println("<a href=\"/?LEDOFF1\"\">Off</a><br>");
                     client.println("METER2:");
-                    client.println("<a href=\"/?LEDON2\"\">On</a>"); 
+                    client.println("<a href=\"/?LEDON2\"\">On</a>");
                     client.println("<a href=\"/?LEDOFF2\"\">Off</a><br>");
                     client.println("METER3:");
-                    client.println("<a href=\"/?LEDON3\"\">On</a>"); 
+                    client.println("<a href=\"/?LEDON3\"\">On</a>");
                     client.println("<a href=\"/?LEDOFF3\"\">Off</a><br>");
 client.println("<body onload=\"GetArduinoInputs()\">");
-client.println(" <h1 style=\"text-align: center\">Group ID: JSJC</h1>"); 
+client.println(" <h1 style=\"text-align: center\">Group ID: JSJC</h1>");
 client.println("</body>");
 client.println("</html>");
 
-      
 
-       
-                  
-           
+
+
+
+
           }
-           
+
                     Serial.print(HTTP_req);
                     // reset buffer index and all buffer elements to 0
                     req_index = 0;
@@ -204,16 +208,16 @@ client.println("</html>");
     // give the web browser time to receive the data
     delay(1);
     client.stop(); // close the connection
-    if(readString.indexOf("?LEDON1") > -1) //checks for LEDON 
-                    { 
-                        digitalWrite(ledPin, HIGH); // set pin high 
-                    } 
-                    else{ 
-                        if(readString.indexOf("?LEDOFF1") > -1) //checks for LEDOFF 
-                        { 
-                            digitalWrite(ledPin, LOW); // set pin low 
-                        } 
-                    } 
+    if(readString.indexOf("?LEDON1") > -1) //checks for LEDON
+                    {
+                        digitalWrite(ledPin, HIGH); // set pin high
+                    }
+                    else{
+                        if(readString.indexOf("?LEDOFF1") > -1) //checks for LEDOFF
+                        {
+                            digitalWrite(ledPin, LOW); // set pin low
+                        }
+                    }
     readString="";
   }
 }
@@ -224,7 +228,7 @@ client.println("</html>");
 void XML_response(EthernetClient cl)
 {
     int analog_val;
-    
+
     cl.print("<?xml version = \"1.0\" ?>");
     cl.print("<inputs>");
     analog_val = meter1; // for test
@@ -260,7 +264,7 @@ char StrContains(char *str, char *sfind)
     char len;
 
     len = strlen(str);
-    
+
     if (strlen(sfind) > len) {
         return 0;
     }
