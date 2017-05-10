@@ -20,7 +20,9 @@ EthernetClient client;
 unsigned long myChannelNumber = 268396;
 const char * myWriteAPIKey = "9WPARD55UC7GX1M4";
 
-float voltage = 3.0;
+float voltage1 = 3.0;
+float voltage2 = 3.0;
+float voltage3 = 3.0;
 void setup() {
 
   Serial.begin(9600);
@@ -33,14 +35,23 @@ void setup() {
   Ethernet.begin(mac);
 
   ThingSpeak.begin(client);
+  randomSeed(444);
 }
 
 void loop() {
   
-  voltage = voltage + 1;
+  voltage1 = random(20,30);
+  voltage2 = random(40,50);
+  voltage3 = random(70,80);
+
+  ThingSpeak.setField(1, (float)voltage1);
+  ThingSpeak.setField(2, (float)voltage2);
+  ThingSpeak.setField(3, (float)voltage3);
 
   // Write to ThingSpeak. There are up to 8 fields in a channel, allowing you to store up to 8 different
   // pieces of information in a channel.  Here, we write to field 1.
-  ThingSpeak.writeField(myChannelNumber, 1, voltage, myWriteAPIKey);
+  ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);  
+
+
   delay(20000); // ThingSpeak will only accept updates every 15 seconds.
 }
