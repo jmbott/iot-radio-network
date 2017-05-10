@@ -1,6 +1,10 @@
 
 Each meter has its assigned hex id as well as unique checksums for each command.
 
+Based on the modbus protocol the schema is as follows,
+
+| ID | Function Code | 2B Address | 2B Data/Length | 2B Checksum |
+
 Meter 5
 -----------------------------------------
   voltage         05 03 00 08 00 01 04 4C
