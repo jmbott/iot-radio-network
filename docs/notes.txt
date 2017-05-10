@@ -1,19 +1,19 @@
 Remote Node,
 
 * checking for incoming transmissions
-    * if incoming transmission then
-      * parse incoming transmission
-        * read data from register
-        * or write data to register
-      * send response
-* read meters and save to registers (flash? EEProm?)
+  * if incoming transmission then
+    * parse incoming transmission
+      * read data from register
+      * or write data to register
+    * send response
+* read meters and save to memory
 
 Main controller,
 
 * check node and meter numbers
   * message each meter on node individually for data
-  * parse response and save data to registers (flash? EEPROM?)
-* manage customer credit? or read from meters?
+  * parse response and save data to memory
+* manage customer credit? or read from meters? (Not implemented)
 * Serve Webapp
-  * Check for input on webapp
-  * read data from registers for webapp
+  * Check for input on webapp, switch coil
+  * read data from memory for webapp
