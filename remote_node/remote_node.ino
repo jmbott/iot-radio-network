@@ -86,6 +86,7 @@ int meter_select = 0; // selected meter, init first meter
 
 
 #define meter_count 1
+// Checksums
 byte meter_num[meter_count] = {0x06};
 byte volt_check1[meter_count] = {0x04};
 byte volt_check2[meter_count] = {0x7F};
@@ -113,6 +114,7 @@ byte on_check2[meter_count] = {0x7E};
 
 /*
 #define meter_count 2
+// Checksums
 byte meter_num[meter_count] = {0x05,0x0B};
 byte volt_check1[meter_count] = {0x04,0x05};
 byte volt_check2[meter_count] = {0x4C,0x62};
@@ -252,31 +254,7 @@ unsigned int echo(int opt) {
 
 /***************************** listen request task ******************************/
 
-/*{0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
-
-unsigned int repy_meter_info(int rank) {
-  Serial.println("Listen Request Task");
-  digitalWrite(LED, HIGH);  // Show activity
-  Serial.print("Selected Meter: "); Serial.println(meter_num[rank],HEX); // Which meter
-  byte byteReceived[8] = {meter_num[rank], 0x03, 0x00, 0x08, 0x00, 0x01, 0x04, 0x7F};
-  Serial.println("Voltage");
-  Serial.println("sending:");
-  for (int i = 0; i < 8; i++) {
-    Serial.print(byteReceived[i],HEX);Serial.print(" ");
-  }
-  Serial.println("");
-
-  digitalWrite(TXcontrol, RS485Transmit);  // Enable RS485 Transmit
-  Serial2.write(byteReceived, 8);          // Send byte to Remote Arduino
-
-  meter_should_receive = 7;
-
-  digitalWrite(LED, LOW);  // Show activity
-  delay(10);
-  digitalWrite(TXcontrol, RS485Receive);  // Disable RS485 Transmit
-  return 1;
-}*/
-
+// Initialize registers for read values
 uint8_t V[4] = {0x00,0x00,0x00,0x00};
 uint8_t C[4] = {0x00,0x00,0x00,0x00};
 uint8_t H[4] = {0x00,0x00,0x00,0x00};
@@ -1146,7 +1124,7 @@ void setup() {
   //Meter_On = taskRegister(meter_on, OS_ST_PER_SECOND*20, 1, 0);
   //Meter_Off = taskRegister(meter_off, OS_ST_PER_SECOND*10, 1, 0);
   //MeterMainTask = taskRegister(meter_main_task, 1, 1, OS_ST_PER_SECOND);
-  MeterMainTask = taskRegister(meter_main_task, OS_ST_PER_SECOND*30, 1, 0);
+  MeterMainTask = taskRegister(meter_main_task, OS_ST_PER_SECOND*5, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms

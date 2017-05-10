@@ -6,13 +6,14 @@
   03.23.2017 - init & programming controller
   03.26.2017 - basic transmission code added, RH_RF95 class
   05.09.2017 - Add lightOS
+  05.09.2017 - Add memory storage
+  05.09.2017 - Add webserver
 
 */
 
 #include "lightOS.h"    // LightOS
 #include "Timer.h"
 #include <Ethernet2.h>  // Webserver
-//#include <SPI.h>
 #include <SPI.h>        // Radio
 #include <RH_RF95.h>
 
@@ -272,16 +273,12 @@ unsigned int radio_transmit(int rank) {
   // Switch from Ethernet to radio
   digitalWrite(8, LOW);
 
-  //char MESSAGE[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
   // Send a message to rf95_server
   Serial.println("Sending to rf95_server");
 
   if (rf_message_type == BEACON) {
     // length specified here 8B max? for rf95
     char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, meter_num[rank], 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-    //MESSAGE = beacon;
-    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
     itoa(packetnum++, radiopacket+16, 16);
     Serial.print("Sending "); Serial.println(radiopacket);
@@ -325,8 +322,6 @@ unsigned int radio_transmit(int rank) {
   else if (rf_message_type == READ_METER) {
     // length specified here 8B max? for rf95
     char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, meter_num[rank], 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-    //MESSAGE = read_meter;
-    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
     itoa(packetnum++, radiopacket+16, 16);
     Serial.print("Sending "); Serial.println(radiopacket);
@@ -381,8 +376,6 @@ unsigned int radio_transmit(int rank) {
   else if (rf_message_type == SWITCH_COIL_ON) {
     // length specified here 8B max? for rf95
     char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, meter_num[rank], 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-    //MESSAGE = switch_on;
-    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
     itoa(packetnum++, radiopacket+16, 16);
     Serial.print("Sending "); Serial.println(radiopacket);
@@ -426,8 +419,6 @@ unsigned int radio_transmit(int rank) {
   else if (rf_message_type == SWITCH_COIL_OFF) {
     // length specified here 8B max? for rf95
     char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, meter_num[rank], 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
-    //MESSAGE = switch_off;
-    //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
     itoa(packetnum++, radiopacket+16, 16);
     Serial.print("Sending "); Serial.println(radiopacket);
@@ -813,7 +804,7 @@ void setup() {
   //Echo = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
   //SwitchOnMeter = taskRegister(switch_on_meter, OS_ST_PER_SECOND*120, 1, 0);
   //SwitchOffMeter = taskRegister(switch_off_meter, OS_ST_PER_SECOND*240, 1, 0);
-  RFReadMeter = taskRegister(rf_read_meter, OS_ST_PER_SECOND*10, 1, 0);
+  RFReadMeter = taskRegister(rf_read_meter, OS_ST_PER_SECOND*5, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
