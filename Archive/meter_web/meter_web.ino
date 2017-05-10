@@ -12,9 +12,9 @@
 byte mac[] = { 0x98, 0x76, 0xB6, 0x10, 0x56, 0xed };
 
 // Set the static IP address, dns, gateway, subnet
-byte ip[] = { 192, 168, 0, 177 };
-byte dnServer[] = { 192, 168, 0, 1 };
-byte gateway[] = { 192, 168, 0, 1 };
+byte ip[] = { 192, 168, 1, 177 };
+byte dnServer[] = { 192, 168, 1, 1 };
+byte gateway[] = { 192, 168, 1, 1 };
 byte subnet[] = { 255, 255, 255, 0 };
 
 // Initialize the Ethernet port
@@ -23,6 +23,9 @@ EthernetServer server(8080);
 
 char HTTP_req[REQ_BUF_SZ] = {0}; // buffered HTTP request stored as null terminated string
 char req_index = 0;              // index into HTTP_req buffer
+
+String readString; 
+int ledPin = 13;
 
 int meter1 = 0;
 int meter2 = 0;
@@ -47,6 +50,7 @@ void setup() {
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);//, dnServer, gateway, subnet
+  pinMode(ledPin, OUTPUT); //pin selected to control 
   server.begin();
   Serial.print("server is at ");
   Serial.println(Ethernet.localIP());
@@ -78,6 +82,10 @@ void httpRequest() {
          HTTP_req[req_index] = c;          // save HTTP request character
          req_index++;
        }
+       if (readString.length() < 100) {
+                    //store characters to string 
+                    readString += c; 
+                }
 
         // if you've gotten to the end of the line (received a newline
         // character) and the line is blank, the http request has ended,
@@ -155,10 +163,24 @@ client.println("gauge1.value = 0;");
 client.println("gauge2.value = 0;");
 client.println("gauge3.value = 0;");
 client.println("</script>");
+                    client.println("METER1:");
+                    client.println("<a href=\"/?LEDON1\"\">On</a>"); 
+                    client.println("<a href=\"/?LEDOFF1\"\">Off</a><br>");
+                    client.println("METER2:");
+                    client.println("<a href=\"/?LEDON2\"\">On</a>"); 
+                    client.println("<a href=\"/?LEDOFF2\"\">Off</a><br>");
+                    client.println("METER3:");
+                    client.println("<a href=\"/?LEDON3\"\">On</a>"); 
+                    client.println("<a href=\"/?LEDOFF3\"\">Off</a><br>");
 client.println("<body onload=\"GetArduinoInputs()\">");
 client.println(" <h1 style=\"text-align: center\">Group ID: JSJC</h1>"); 
 client.println("</body>");
 client.println("</html>");
+
+      
+
+       
+                  
            
           }
            
@@ -182,8 +204,22 @@ client.println("</html>");
     // give the web browser time to receive the data
     delay(1);
     client.stop(); // close the connection
+    if(readString.indexOf("?LEDON1") > -1) //checks for LEDON 
+                    { 
+                        digitalWrite(ledPin, HIGH); // set pin high 
+                    } 
+                    else{ 
+                        if(readString.indexOf("?LEDOFF1") > -1) //checks for LEDOFF 
+                        { 
+                            digitalWrite(ledPin, LOW); // set pin low 
+                        } 
+                    } 
+    readString="";
   }
 }
+
+
+
 
 void XML_response(EthernetClient cl)
 {
@@ -242,4 +278,3 @@ char StrContains(char *str, char *sfind)
     }
     return 0;
 }
-
