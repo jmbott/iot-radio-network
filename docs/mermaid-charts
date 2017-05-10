@@ -1,0 +1,179 @@
+# http://knsv.github.io/mermaid/live_editor/
+
+graph TB
+    D["Main Feather"]
+    F1["Remote Feather"]
+    F2["Remote Feather"]
+    F3["Remote Feather"]
+    D--> |Radio Link| F1
+    D--> |Radio Link| F2
+    D--> |Radio Link| F3
+    F1--> |TTL| Converter1
+    F2--> |TTL| Converter2
+    F3--> |TTL| Converter3
+    Converter1--> |RS485| Meter1
+    Converter2--> |RS485| Meter2
+    Converter3--> |RS485| Meter4
+    subgraph C
+    Meter4 --- |DaisyChained| Meter5
+    Meter5 --- |DaisyChained| Meter6
+    end
+    subgraph B
+    Meter2 --- |DaisyChained| Meter3
+    end
+    subgraph A
+    Meter1
+    end
+    Webbapp-->|https|ServerDatabase
+    D-->|http|ServerDatabase
+
+graph LR
+    B(("Generation Point"))
+    B-->M1
+    M1-->M2
+    M2-->M3
+    M3-->M4
+    M4-->M5
+
+graph TB
+    B(("Generation Point"))
+    B-->M1
+    B-->M2
+    B-->M3
+    B-->M4
+    B-->M5
+
+graph LR
+    subgraph User Interface
+    D{"Webapp"}
+    end
+    subgraph Cloud Components
+    C(("EC2 Cloud Server"))
+    C --- |https| D
+    end
+    subgraph Local Devices
+    E["Meters"] --> |Serial|A["Radio Node"]
+    F["Meters"] --> |Serial|G["Radio Node"]
+    G-->|RF|B["Main Controller"]
+    A-->|RF|B["Main Controller"]
+    B --- |http| C
+    end
+
+graph LR
+    subgraph User Interface
+    D{"Tornado Webapp"}
+    end
+    subgraph Cloud Components
+    C(("EC2 Cloud Server"))
+    C --- |https| D
+    end
+    subgraph Local Devices
+    E["Meters"] --> |RS485|H["Converter"]
+    F["Meters"] --> |RS485|I["Converter"]
+    H --> |TTL|A["LoRa Radio Node"]
+    I--> |TTL|G["LoRa Radio Node"]
+    G-->|RF|B["Main Controller ARM"]
+    A-->|RF|B["Main Controller ARM"]
+    B --- |http| C
+    end
+
+graph LR
+    subgraph User Interface
+    C{"Webapp"}
+    end
+    subgraph Local Devices
+    E["Meters"] --> |RS485|H["Converter"]
+    F["Meters"] --> |RS485|I["Converter"]
+    H --> |TTL|A["LoRa Radio Node"]
+    I--> |TTL|G["LoRa Radio Node"]
+    G-->|RF|B["Main Controller ARM"]
+    A-->|RF|B["Main Controller ARM"]
+    B --- |http| C
+    end
+
+graph LR
+    A(("Main Controller"))
+    B(("Meter"))
+
+    subgraph EC2 Server
+    C(("PostgreSQL Database"))
+    D(("Tornado Webserver"))
+    K["Post to Database"]
+    L["Read Database"]
+    end
+
+    E["Read Database"]
+    F["Read Meter"]
+    G["Switch Meter Relay"]
+    H["Post to Database"]
+    I["Measure Energy Used"]
+    J["Display Consumption"]
+    M{"Sync Time"}
+
+    A --- F
+    A --- G
+
+    F --- B
+    G --- B
+
+    D --- K
+    D --- L
+    L --- C
+    K --- C
+
+    C --- H
+    C ---E
+
+    H --- A
+    E --- A
+
+    B --- I
+    B --- J
+
+    D --- M
+    M --- A
+    M --- B
+
+
+graph LR
+    A(("Main Controller"))
+    B(("Meter"))
+
+    subgraph Web Server
+    C(("JavaScript Variables"))
+    D(("HTML/CSS Display"))
+    K["Post to Variables"]
+    L["Read Variables"]
+    end
+
+    E["Read Memory"]
+    F["Read Meter"]
+    G["Switch Meter Relay"]
+    H["Post to Memory"]
+    I["Measure Energy Used"]
+    J["Display Consumption"]
+    M{"Sync Time"}
+
+    A --- F
+    A --- G
+
+    F --- B
+    G --- B
+
+    D --- K
+    D --- L
+    L --- C
+    K --- C
+
+    C --- H
+    C ---E
+
+    H --- A
+    E --- A
+
+    B --- I
+    B --- J
+
+    D --- M
+    M --- A
+    M --- B

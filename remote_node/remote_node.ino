@@ -84,7 +84,7 @@ int meter_select = 0; // selected meter, init first meter
 
 // byte meter_num[meter_count] = {METER_NUMER_1,METER_NUMER_2,etc...};
 
-
+/*
 #define meter_count 1
 // Checksums
 byte meter_num[meter_count] = {0x06};
@@ -110,9 +110,9 @@ byte off_check1[meter_count] = {0x19};
 byte off_check2[meter_count] = {0xBE};
 byte on_check1[meter_count] = {0xD8};
 byte on_check2[meter_count] = {0x7E};
+*/
 
 
-/*
 #define meter_count 2
 // Checksums
 byte meter_num[meter_count] = {0x05,0x0B};
@@ -138,7 +138,7 @@ byte on_check1[meter_count] = {0xD8,0xD9};
 byte on_check2[meter_count] = {0x4D,0x63};
 byte off_check1[meter_count] = {0x19,0x18};
 byte off_check2[meter_count] = {0x8D,0xA3};
-*/
+
 
 // Structure for stored data
 typedef struct {
