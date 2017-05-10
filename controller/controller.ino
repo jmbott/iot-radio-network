@@ -21,7 +21,9 @@ Timer t;
 
 //****task variables****//
 OS_TASK *Echo;
-OS_TASK *RFTransmit;
+//OS_TASK *SwitchOnMeter;
+//OS_TASK *SwitchOffMeter;
+OS_TASK *RFReadMeter;
 //OS_TASK *ListenRadio;
 OS_TASK *WebServer;
 
@@ -69,11 +71,6 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 #define SWITCH_COIL_ON    2
 #define SWITCH_COIL_OFF   3
 
-#define beacon {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
-#define read_meter {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
-#define switch_on {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
-#define switch_off {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF}
-
 int rf_message_type = -1;
 
 // Define reply TIMEOUT
@@ -120,9 +117,10 @@ void initMeterDataStruct() {
     meter_type[j].relay_status = 0;
     meter_type[j].temp = 0;
     meter_type[j].warnings = 1;
-    meter_type[j].flag = METER_STATUS_POWER_ON;
   }
 }
+
+int meter_select = 0;
 
 /******************************* memory init end ********************************/
 
@@ -192,7 +190,65 @@ unsigned int echo(int opt) {
 
 /******************************** Send RF tasks *********************************/
 
-unsigned int radio_transmit(int opt) {
+long convert_two(byte data1, byte data2) {
+  byte p[2] = {0x00,0x00};
+  p[0] = data1;
+  p[1] = data2;
+
+  Serial.print(p[0], HEX);
+  Serial.print("  ");
+  Serial.println(p[1], HEX);
+
+  Serial.print(p[0], BIN);
+  Serial.print("  ");
+  Serial.println(p[1], BIN);
+
+  long d0 = p[0] << 8;
+  long d1 = p[1];
+  long d = d0 | d1;
+
+  Serial.println(d, BIN);
+  Serial.println(d);
+
+  return d;
+}
+
+long convert_four(byte data1, byte data2, byte data3, byte data4) {
+  byte p[4] = {0x00,0x00,0x00,0x00};
+  p[0] = data1;
+  p[1] = data2;
+  p[2] = data3;
+  p[3] = data4;
+
+  Serial.print(p[0], HEX);
+  Serial.print("  ");
+  Serial.print(p[1], HEX);
+  Serial.print("  ");
+  Serial.print(p[2], HEX);
+  Serial.print("  ");
+  Serial.println(p[3], HEX);
+
+  Serial.print(p[0], BIN);
+  Serial.print("  ");
+  Serial.println(p[1], BIN);
+  Serial.print("  ");
+  Serial.print(p[2], BIN);
+  Serial.print("  ");
+  Serial.println(p[3], BIN);
+
+  long d0 = p[0] << 24;
+  long d1 = p[1] << 16;
+  long d2 = p[2] << 8;
+  long d3 = p[3];
+  long d = d0 | d1 | d2 | d3;
+
+  Serial.println(d, BIN);
+  Serial.println(d);
+
+  return d;
+}
+
+unsigned int radio_transmit(int rank) {
 
   //char MESSAGE[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
@@ -201,7 +257,7 @@ unsigned int radio_transmit(int opt) {
 
   if (rf_message_type == BEACON) {
     // length specified here 8B max? for rf95
-    char radiopacket[16] = beacon;
+    char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, meter_num[rank], 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     //MESSAGE = beacon;
     //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x01, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
@@ -246,7 +302,7 @@ unsigned int radio_transmit(int opt) {
   }
   else if (rf_message_type == READ_METER) {
     // length specified here 8B max? for rf95
-    char radiopacket[16] = read_meter;
+    char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, meter_num[rank], 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     //MESSAGE = read_meter;
     //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x02, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
@@ -272,6 +328,15 @@ unsigned int radio_transmit(int opt) {
         digitalWrite(LED, HIGH);
         // print in the serial monitor what was recived
         RH_RF95::printBuffer("Received: ", buf, len);
+        meter_type[meter_num[rank]].voltage = convert_two(buf[8],buf[7]);
+        meter_type[meter_num[rank]].amp = convert_two(buf[10],buf[9]);
+        meter_type[meter_num[rank]].frequency = convert_two(buf[12],buf[11]);
+        meter_type[meter_num[rank]].watt = convert_two(buf[14],buf[13]);
+        meter_type[meter_num[rank]].power_factor = convert_two(buf[16],buf[15]);
+        meter_type[meter_num[rank]].kwh = convert_four(buf[20],buf[19],buf[18],buf[17]);
+        meter_type[meter_num[rank]].relay_status = convert_two(buf[22],buf[21]);
+        meter_type[meter_num[rank]].temp = convert_two(buf[24],buf[23]);
+        meter_type[meter_num[rank]].warnings = convert_two(buf[26],buf[25]);
         //Serial.print("Got reply: ");
         //Serial.println((char*)buf);
         // and the signal strength
@@ -291,7 +356,7 @@ unsigned int radio_transmit(int opt) {
   }
   else if (rf_message_type == SWITCH_COIL_ON) {
     // length specified here 8B max? for rf95
-    char radiopacket[16] = switch_on;
+    char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, meter_num[rank], 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     //MESSAGE = switch_on;
     //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x01, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
@@ -336,7 +401,7 @@ unsigned int radio_transmit(int opt) {
   }
   else if (rf_message_type == SWITCH_COIL_OFF) {
     // length specified here 8B max? for rf95
-    char radiopacket[16] = switch_off;
+    char radiopacket[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, meter_num[rank], 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     //MESSAGE = switch_off;
     //char MESSAGE[16] = {0xAA, 0xAA, 0xAA, 0x01, 0x01, 0x03, 0x06, 0x00, 0x01, 0x02, 0x03, 0x04, 0xD8, 0xFF, 0xFF, 0xFF};
     // number position specify, must be within packetlength and can't be spaced with none
@@ -382,15 +447,35 @@ unsigned int radio_transmit(int opt) {
   return 1;
 }
 
-unsigned int switch_on(int opt) {
-  rf_message_type = 2;
-  radio_transmit();
+unsigned int rf_read_meter(int opt) {
+  rf_message_type = 1;
+  for (int i = 0; i < meter_count; i++) {
+    radio_transmit(i);
+    Serial.println("----------------------------------------------------------------");
+    Serial.print("Meter: "); Serial.println(meter_num[i]);
+    Serial.print("Voltage: "); Serial.println(meter_type[i].voltage);
+    Serial.print("Current: "); Serial.println(meter_type[i].amp);
+    Serial.print("Hertz: "); Serial.println(meter_type[i].frequency);
+    Serial.print("Watts: "); Serial.println(meter_type[i].watt);
+    Serial.print("PF: "); Serial.println(meter_type[i].power_factor);
+    Serial.print("Energy: "); Serial.println(meter_type[i].kwh);
+    Serial.print("Relay Status: "); Serial.println(meter_type[i].relay_status);
+    Serial.print("Temp: "); Serial.println(meter_type[i].temp);
+    Serial.print("Warnings: "); Serial.println(meter_type[i].warnings);
+    Serial.println("----------------------------------------------------------------");
+  }
   return 1;
 }
 
-unsigned int switch_off(int opt) {
+unsigned int switch_on_meter(int opt) {
+  rf_message_type = 2;
+  radio_transmit(meter_select);
+  return 1;
+}
+
+unsigned int switch_off_meter(int opt) {
   rf_message_type = 3;
-  radio_transmit();
+  radio_transmit(meter_select);
   return 1;
 }
 
@@ -447,7 +532,9 @@ void setup() {
   OS_TASK *taskRegister(unsigned int (*funP)(int opt),unsigned long interval,unsigned char status,unsigned long temp_interval)
   taskRegister(FUNCTION, INTERVAL, STATUS, TEMP_INTERVAL); */
   //Echo = taskRegister(echo, OS_ST_PER_SECOND*10, 1, 0);
-  RFTransmit = taskRegister(radio_transmit, OS_ST_PER_SECOND*10, 1, OS_ST_PER_SECOND*5);
+  //SwitchOnMeter = taskRegister(switch_on_meter, OS_ST_PER_SECOND*120, 1, 0);
+  //SwitchOffMeter = taskRegister(switch_off_meter, OS_ST_PER_SECOND*240, 1, 0);
+  RFReadMeter = taskRegister(rf_read_meter, OS_ST_PER_SECOND*20, 1, 0);
 
   // ISR or Interrupt Service Routine for async
   t.every(5, onDutyTime);  // Calls every 5ms
@@ -464,7 +551,6 @@ void loop() {
 void constantTask() {
   t.update();
   //echo(0);
-  //radio_transmit(SWITCH_COIL_OFF); // overload
 }
 
 // support Function onDutyTime: support function for task management
