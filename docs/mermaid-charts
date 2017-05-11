@@ -177,3 +177,23 @@ graph LR
     D --- M
     M --- A
     M --- B
+
+graph LR
+    A["Check Time"]
+    B["Listen For RF"]
+    C["Listen For Meter"]
+
+    D["Send Request To Meter"]
+
+    E["Read Database"]
+    F["Read Meter"]
+    G["Switch Meter Relay"]
+    H["Post to Database"]
+    I["Measure Energy Used"]
+    J["Display Consumption"]
+    M{"Sync Time"}
+
+    C --> A
+
+    A --> B
+    B --> C
