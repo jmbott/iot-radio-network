@@ -18,7 +18,7 @@ For compile,
 
 ## Overview
 
-Both controllers use interrupts through the lightS and Timer libraries allowing 
+Both controllers use interrupts through the lightOS and Timer libraries allowing 
 for asynchronous behavior.
 
 **controller**
